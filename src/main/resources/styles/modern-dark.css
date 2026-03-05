@@ -8,9 +8,9 @@
     -fx-base: #181818;
     -fx-background: #181818;
     -fx-control-inner-background: #282828;
-    -fx-accent: #1db954;
-    -fx-focus-color: #1db954;
-    -fx-faint-focus-color: #1db95422;
+    -fx-accent: #00d9ff;
+    -fx-focus-color: #00d9ff;
+    -fx-faint-focus-color: #00d9ff22;
 
     /* Text colors */
     -fx-text-base-color: #ffffff;
@@ -111,19 +111,19 @@
 
 /* Primary button (Browse Directory) */
 .button.primary {
-    -fx-background-color: #1db954;
-    -fx-border-color: #1db954;
+    -fx-background-color: linear-gradient(to bottom, #00e5ff, #00a8cc);
+    -fx-border-color: #00d9ff;
     -fx-text-fill: #000000;
     -fx-font-weight: bold;
 }
 
 .button.primary:hover {
-    -fx-background-color: #1ed760;
-    -fx-border-color: #1ed760;
+    -fx-background-color: linear-gradient(to bottom, #00f5ff, #00b8dc);
+    -fx-border-color: #00f5ff;
 }
 
 .button.primary:pressed {
-    -fx-background-color: #1aa34a;
+    -fx-background-color: linear-gradient(to bottom, #0088aa, #006688);
 }
 
 /* === MENU BUTTON === */
@@ -176,7 +176,7 @@
 }
 
 .text-field:focused {
-    -fx-border-color: #1db954;
+    -fx-border-color: #00d9ff;
     -fx-background-color: #333333;
 }
 
@@ -194,7 +194,7 @@
 }
 
 .text-area:focused {
-    -fx-border-color: #1db954;
+    -fx-border-color: #00d9ff;
 }
 
 /* === LABELS === */
@@ -258,13 +258,13 @@
 }
 
 .table-row-cell:selected {
-    -fx-background-color: #1db95433;
-    -fx-border-color: transparent transparent #1db954 transparent;
+    -fx-background-color: #00d9ff33;
+    -fx-border-color: transparent transparent #00d9ff transparent;
     -fx-border-width: 0 0 2px 0;
 }
 
 .table-row-cell:selected .table-cell {
-    -fx-text-fill: #1ed760;
+    -fx-text-fill: #00f5ff;
 }
 
 .table-view .filler {
@@ -311,11 +311,11 @@
 
 /* === PROGRESS INDICATOR === */
 .progress-indicator {
-    -fx-progress-color: #1db954;
+    -fx-progress-color: #00d9ff;
 }
 
 .progress-indicator .percentage {
-    -fx-fill: #1db954;
+    -fx-fill: #00d9ff;
 }
 
 /* === DIALOGS === */
@@ -333,7 +333,7 @@
 }
 
 .dialog-pane > .header-panel > .label {
-    -fx-text-fill: #1db954;
+    -fx-text-fill: #00d9ff;
     -fx-font-size: 16px;
     -fx-font-weight: bold;
 }
@@ -359,7 +359,7 @@
 }
 
 .alert .header-panel .label {
-    -fx-text-fill: #1db954;
+    -fx-text-fill: #00d9ff;
 }
 
 /* === TOOLTIP === */
@@ -400,6 +400,6 @@
 
 /* === SELECTION HIGHLIGHT === */
 .table-view:focused .table-row-cell:selected {
-    -fx-background-color: #1db95444;
+    -fx-background-color: #00d9ff44;
 }
 

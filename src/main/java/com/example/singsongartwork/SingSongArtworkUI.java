@@ -72,7 +72,7 @@ public class SingSongArtworkUI extends Application {
 
         // App title on left
         Label titleLabel = new Label("SingSongArtwork");
-        titleLabel.setStyle("-fx-text-fill: #1db954; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
+        titleLabel.setStyle("-fx-text-fill: #00d9ff; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
 
         // Hamburger menu (☰)
         MenuButton helpMenu = new MenuButton("☰");
