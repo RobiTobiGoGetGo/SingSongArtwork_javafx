@@ -117,7 +117,39 @@ public class SingSongArtworkUI extends Application {
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
         helpMenu.getItems().add(shortcutsItem);
 
-        menuBar.getMenus().add(helpMenu);
+        // Three-dot menu (⋮) on the right side
+        Menu optionsMenu = new Menu("⋮");
+        optionsMenu.setStyle("-fx-font-size: 18px;");
+
+        // Directory info as menu label (non-clickable)
+        CustomMenuItem dirMenuItem = new CustomMenuItem();
+        VBox dirInfo = new VBox(4);
+        dirInfo.setPadding(new Insets(8, 12, 8, 12));
+        Label dirTitleLabel = new Label("Current Directory:");
+        dirTitleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+        dirLabel = new Label("No directory selected");
+        dirLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #ffffff;");
+        dirLabel.setWrapText(true);
+        dirLabel.setMaxWidth(300);
+        dirInfo.getChildren().addAll(dirTitleLabel, dirLabel);
+        dirMenuItem.setContent(dirInfo);
+        dirMenuItem.setHideOnClick(false);
+
+        SeparatorMenuItem separator1 = new SeparatorMenuItem();
+
+        MenuItem browseItem = new MenuItem("Browse Directory...");
+        browseItem.setOnAction(e -> openDirectoryChooser());
+
+        MenuItem reloadItem = new MenuItem("Reload Directory");
+        reloadItem.setOnAction(e -> {
+            if (currentDirectory != null) {
+                loadTracksAsync(currentDirectory);
+            }
+        });
+
+        optionsMenu.getItems().addAll(dirMenuItem, separator1, browseItem, reloadItem);
+
+        menuBar.getMenus().addAll(helpMenu, optionsMenu);
         return menuBar;
     }
 
@@ -163,37 +195,21 @@ public class SingSongArtworkUI extends Application {
         vbox.setPadding(new Insets(16));
         vbox.getStyleClass().add("top-panel");
 
-        // Toolbar row with menu button and directory display
-        HBox toolBar = new HBox(12);
-        toolBar.setAlignment(Pos.CENTER_LEFT);
+        // Filter row with loading indicator
+        HBox filterBox = new HBox(12);
+        filterBox.setAlignment(Pos.CENTER_LEFT);
+        filterBox.getStyleClass().add("filter-box");
 
-        // Three-dot menu button
-        MenuButton menuButton = new MenuButton("⋮");
-        menuButton.getStyleClass().add("menu-button");
-        menuButton.setStyle("-fx-font-size: 20px; -fx-padding: 8px 16px;");
+        Label filterLabel = new Label("Filter:");
 
-        // Menu items
-        MenuItem browseItem = new MenuItem("Browse Directory...");
-        browseItem.setOnAction(e -> openDirectoryChooser());
+        filterTextField = new TextField();
+        filterTextField.setPromptText("Search tracks by filename, title, or artist...");
+        filterTextField.setPrefWidth(400);
+        HBox.setHgrow(filterTextField, Priority.ALWAYS);
+        filterTextField.setOnKeyReleased(e -> applyFilter());
 
-        MenuItem reloadItem = new MenuItem("Reload Directory");
-        reloadItem.setOnAction(e -> {
-            if (currentDirectory != null) {
-                loadTracksAsync(currentDirectory);
-            }
-        });
-
-        menuButton.getItems().addAll(browseItem, reloadItem);
-
-        // Directory label (always visible)
-        VBox dirInfo = new VBox(2);
-        Label dirTitleLabel = new Label("Current Directory:");
-        dirTitleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-        dirLabel = new Label("No directory selected");
-        dirLabel.getStyleClass().add("secondary");
-        dirLabel.setStyle("-fx-font-size: 13px;");
-        dirInfo.getChildren().addAll(dirTitleLabel, dirLabel);
-        HBox.setHgrow(dirInfo, Priority.ALWAYS);
+        Button clearFilterBtn = new Button("Clear");
+        clearFilterBtn.setOnAction(e -> clearFilter());
 
         // Loading indicator
         loadingIndicator = new ProgressIndicator();
@@ -201,25 +217,8 @@ public class SingSongArtworkUI extends Application {
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
 
-        toolBar.getChildren().addAll(menuButton, dirInfo, loadingIndicator);
+        filterBox.getChildren().addAll(filterLabel, filterTextField, clearFilterBtn, loadingIndicator);
 
-        // Filter row
-        HBox filterBox = new HBox(12);
-        filterBox.setAlignment(Pos.CENTER_LEFT);
-        filterBox.getStyleClass().add("filter-box");
-        Label filterLabel = new Label("Filter:");
-        filterTextField = new TextField();
-        filterTextField.setPromptText("Search tracks by filename, title, or artist...");
-        filterTextField.setPrefWidth(400);
-        HBox.setHgrow(filterTextField, Priority.ALWAYS);
-        filterTextField.setOnKeyReleased(e -> applyFilter());
-        Button clearFilterBtn = new Button("Clear");
-        clearFilterBtn.setOnAction(e -> clearFilter());
-        filterBox.getChildren().add(filterLabel);
-        filterBox.getChildren().add(filterTextField);
-        filterBox.getChildren().add(clearFilterBtn);
-
-        vbox.getChildren().add(toolBar);
         vbox.getChildren().add(filterBox);
         return vbox;
     }
