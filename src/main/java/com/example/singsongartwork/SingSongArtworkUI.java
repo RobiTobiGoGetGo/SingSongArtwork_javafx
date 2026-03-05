@@ -196,9 +196,19 @@ public class SingSongArtworkUI extends Application {
                 new FileChooser.ExtensionFilter("Image Files", "*.jpg", "*.jpeg", "*.png", "*.gif"),
                 new FileChooser.ExtensionFilter("All Files", "*.*")
         );
+
+        // Set initial directory to last used artwork directory
+        Path lastArtworkDir = getLastArtworkDirectory();
+        if (lastArtworkDir != null && Files.isDirectory(lastArtworkDir)) {
+            chooser.setInitialDirectory(lastArtworkDir.toFile());
+        }
+
         File imageFile = chooser.showOpenDialog(null);
 
         if (imageFile != null) {
+            // Save the artwork directory for next time
+            saveLastArtworkDirectory(imageFile.toPath().getParent());
+
             int successCount = 0;
             int failureCount = 0;
 
@@ -217,20 +227,73 @@ public class SingSongArtworkUI extends Application {
 
             // Reload the tracks to show the updated artwork
             loadTracks(currentDirectory);
-        }
-    }
+        }    }
 
     private void saveLastDirectory(Path directory) {
         try {
             ensureConfigDirectory();
             Properties props = new Properties();
             props.setProperty("last.directory", directory.toString());
+
+            // Also load and preserve last artwork directory if it exists
+            Path lastArtworkDir = getLastArtworkDirectory();
+            if (lastArtworkDir != null) {
+                props.setProperty("last.artwork.directory", lastArtworkDir.toString());
+            }
+
             try (var out = Files.newOutputStream(CONFIG_FILE)) {
                 props.store(out, "SingSongArtwork Configuration");
             }
         } catch (IOException ex) {
             statusLabel.setText("Warning: Could not save directory preference: " + ex.getMessage());
         }
+    }
+
+    private void saveLastArtworkDirectory(Path directory) {
+        try {
+            ensureConfigDirectory();
+            Properties props = new Properties();
+
+            // Load existing properties
+            if (Files.exists(CONFIG_FILE)) {
+                try (var in = Files.newInputStream(CONFIG_FILE)) {
+                    props.load(in);
+                }
+            }
+
+            // Update artwork directory
+            if (directory != null) {
+                props.setProperty("last.artwork.directory", directory.toString());
+            }
+
+            // Save
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            statusLabel.setText("Warning: Could not save artwork directory preference: " + ex.getMessage());
+        }
+    }
+
+    private Path getLastArtworkDirectory() {
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = new Properties();
+                try (var in = Files.newInputStream(CONFIG_FILE)) {
+                    props.load(in);
+                }
+                String lastArtworkDir = props.getProperty("last.artwork.directory");
+                if (lastArtworkDir != null && !lastArtworkDir.isBlank()) {
+                    Path lastPath = Paths.get(lastArtworkDir);
+                    if (Files.isDirectory(lastPath)) {
+                        return lastPath;
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            // Silently ignore
+        }
+        return null;
     }
 
     private void initializeLastDirectoryPath() {
