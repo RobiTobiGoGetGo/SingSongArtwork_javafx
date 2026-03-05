@@ -54,6 +54,12 @@ public class SingSongArtworkUI extends Application {
         Scene scene = new Scene(root, 900, 600);
         primaryStage.setTitle("SingSongArtwork");
         primaryStage.setScene(scene);
+
+        // Properly terminate the application when the window is closed
+        primaryStage.setOnCloseRequest(e -> {
+            System.exit(0);
+        });
+
         primaryStage.show();
 
         // Initialize dirLabel with the last used directory path (but don't load it)
