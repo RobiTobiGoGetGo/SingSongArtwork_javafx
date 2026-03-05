@@ -38,9 +38,18 @@
     -fx-font-size: 13px;
 }
 
+.menu-bar .menu {
+    -fx-background-color: transparent;
+}
+
 .menu-bar .menu:hover,
 .menu-bar .menu:showing {
-    -fx-background-color: #282828;
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 4px;
+}
+
+.menu-bar .menu .label {
+    -fx-text-fill: #ffffff;
 }
 
 .context-menu {

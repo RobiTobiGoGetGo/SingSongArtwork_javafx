@@ -23,6 +23,7 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -64,62 +65,29 @@ public class SingSongArtworkUI extends Application {
         // Main layout
         BorderPane root = new BorderPane();
 
-        // Menu bar
-        MenuBar menuBar = createMenuBar();
+        // Custom title bar area + menu bar
+        HBox titleBar = new HBox();
+        titleBar.setStyle("-fx-background-color: #000000; -fx-padding: 0;");
+        titleBar.setAlignment(Pos.CENTER_LEFT);
 
-        // Top: menu bar and directory selection/controls
-        VBox topSection = new VBox();
-        topSection.getChildren().add(menuBar);
-        VBox topPanel = createTopPanel();
-        topSection.getChildren().add(topPanel);
-        root.setTop(topSection);
+        // App title on left
+        Label titleLabel = new Label("SingSongArtwork");
+        titleLabel.setStyle("-fx-text-fill: #1db954; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
 
-        // Center: table
-        trackTable = createTrackTable();
-        root.setCenter(trackTable);
-
-        // Bottom: status
-        root.setBottom(createStatusBar());
-
-        Scene scene = new Scene(root, 1200, 750);
-
-        // Apply modern dark theme CSS
-        String css = getClass().getResource("/styles/modern-dark.css").toExternalForm();
-        scene.getStylesheets().add(css);
-
-        primaryStage.setTitle("SingSongArtwork");
-        primaryStage.setMinWidth(900);
-        primaryStage.setMinHeight(600);
-        primaryStage.setScene(scene);
-        configureKeyboardShortcuts(scene);
-
-        // Initialize dirLabel with the last used directory path (but don't load it)
-        initializeLastDirectoryPath();
-
-        // Properly terminate the application when the window is closed
-        primaryStage.setOnCloseRequest(e -> {
-            e.consume();
-            System.exit(0);
-        });
-
-        primaryStage.show();
-
-        // ALWAYS auto-open directory chooser on startup (user must explicitly choose directory)
-        Platform.runLater(this::openDirectoryChooser);
-    }
-
-    private MenuBar createMenuBar() {
-        MenuBar menuBar = new MenuBar();
-
-        // Help menu
-        Menu helpMenu = new Menu("Help");
+        // Hamburger menu (☰)
+        MenuButton helpMenu = new MenuButton("☰");
+        helpMenu.setStyle("-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 20px; -fx-padding: 8px 12px;");
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
         helpMenu.getItems().add(shortcutsItem);
 
-        // Three-dot menu (⋮) on the right side
-        Menu optionsMenu = new Menu("⋮");
-        optionsMenu.setStyle("-fx-font-size: 18px;");
+        // Spacer to push three-dot menu to the right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // Three-dot menu (⋮) on far right
+        MenuButton optionsMenu = new MenuButton("⋮");
+        optionsMenu.setStyle("-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 24px; -fx-padding: 8px 16px;");
 
         // Directory info as menu label (non-clickable)
         CustomMenuItem dirMenuItem = new CustomMenuItem();
@@ -149,9 +117,63 @@ public class SingSongArtworkUI extends Application {
 
         optionsMenu.getItems().addAll(dirMenuItem, separator1, browseItem, reloadItem);
 
-        menuBar.getMenus().addAll(helpMenu, optionsMenu);
-        return menuBar;
+        titleBar.getChildren().addAll(titleLabel, helpMenu, spacer, optionsMenu);
+
+        // Top section: title bar + controls
+        VBox topSection = new VBox();
+        topSection.getChildren().add(titleBar);
+        VBox topPanel = createTopPanel();
+        topSection.getChildren().add(topPanel);
+        root.setTop(topSection);
+
+        // Center: table
+        trackTable = createTrackTable();
+        root.setCenter(trackTable);
+
+        // Bottom: status
+        root.setBottom(createStatusBar());
+
+        Scene scene = new Scene(root, 1200, 750);
+
+        // Apply modern dark theme CSS
+        String css = getClass().getResource("/styles/modern-dark.css").toExternalForm();
+        scene.getStylesheets().add(css);
+
+        // Set window background to dark
+        scene.setFill(javafx.scene.paint.Color.rgb(24, 24, 24));
+
+        primaryStage.setTitle("SingSongArtwork");
+        primaryStage.setMinWidth(900);
+        primaryStage.setMinHeight(600);
+        primaryStage.setScene(scene);
+
+        // Try to get dark title bar on Windows 11
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                // This will make the title bar dark on Windows 11
+                primaryStage.initStyle(javafx.stage.StageStyle.DECORATED);
+            }
+        } catch (Exception e) {
+            // Ignore if not supported
+        }
+
+        configureKeyboardShortcuts(scene);
+
+        // Initialize dirLabel with the last used directory path (but don't load it)
+        initializeLastDirectoryPath();
+
+        // Properly terminate the application when the window is closed
+        primaryStage.setOnCloseRequest(e -> {
+            e.consume();
+            System.exit(0);
+        });
+
+        primaryStage.show();
+
+        // ALWAYS auto-open directory chooser on startup (user must explicitly choose directory)
+        Platform.runLater(this::openDirectoryChooser);
     }
+
 
     private void showKeyboardShortcuts() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
