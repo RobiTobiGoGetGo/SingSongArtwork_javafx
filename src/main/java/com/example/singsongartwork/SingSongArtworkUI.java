@@ -28,6 +28,9 @@ import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.util.Duration;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -56,6 +59,15 @@ public class SingSongArtworkUI extends Application {
     private TableColumn<TrackEntry, String> filenameColumn;
     private TableColumn<TrackEntry, String> titleColumn;
     private TableColumn<TrackEntry, String> artistColumn;
+    private TableColumn<TrackEntry, TrackEntry> transportColumn;
+    private Label nowPlayingLabel;
+    private Label playbackTimeLabel;
+    private Slider playbackSlider;
+    private Button playbackPlayPauseButton;
+    private Button playbackStopButton;
+    private MediaPlayer mediaPlayer;
+    private Path playingTrackPath;
+    private boolean scrubbingPlayback;
     private boolean moreColumnsMode = false; // default: Less mode
     private boolean adminMode = false; // default: User mode
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
@@ -86,7 +98,7 @@ public class SingSongArtworkUI extends Application {
         titleLabel.setStyle("-fx-text-fill: #00d9ff; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
 
         // Hamburger menu (☰)
-        String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 24px; -fx-font-weight: bold; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
+        String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 12px; -fx-font-weight: normal; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
         MenuButton helpMenu = new MenuButton("☰");
         helpMenu.setStyle(topIconStyle);
         helpMenu.getStyleClass().add("icon-menu-button");
@@ -98,10 +110,9 @@ public class SingSongArtworkUI extends Application {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Three-dot menu (⋮) on far right - larger font size to match visual weight of hamburger
-        String optionsIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
+        // Three-dot menu (⋮) on far right
         MenuButton optionsMenu = new MenuButton("⋮");
-        optionsMenu.setStyle(optionsIconStyle);
+        optionsMenu.setStyle(topIconStyle);
         optionsMenu.getStyleClass().add("icon-menu-button");
 
         // Directory info as menu label (non-clickable)
@@ -203,8 +214,8 @@ public class SingSongArtworkUI extends Application {
         trackTable = createTrackTable();
         root.setCenter(trackTable);
 
-        // Bottom: status
-        root.setBottom(createStatusBar());
+        // Bottom: playback bar + status
+        root.setBottom(createBottomPanel());
 
         Scene scene = new Scene(root, 1200, 750);
 
@@ -238,6 +249,7 @@ public class SingSongArtworkUI extends Application {
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
+            disposeMediaPlayer();
             System.exit(0);
         });
 
@@ -508,7 +520,37 @@ public class SingSongArtworkUI extends Application {
         artworkColumn.setSortable(true);
         artworkColumn.setResizable(true);
 
-        // Required order: Artwork first.
+        transportColumn = new TableColumn<>("Play");
+        transportColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
+        transportColumn.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(TrackEntry item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                String symbol = "▶";
+                if (isCurrentTrack(item) && mediaPlayer != null && mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+                    symbol = "⏸";
+                }
+
+                Button button = new Button(symbol);
+                button.setFocusTraversable(false);
+                button.setStyle("-fx-padding: 4px 8px; -fx-font-size: 12px;");
+                button.setOnAction(e -> onTransportClicked(item));
+                setText(null);
+                setGraphic(button);
+            }
+        });
+        transportColumn.setPrefWidth(72);
+        transportColumn.setSortable(false);
+        transportColumn.setResizable(false);
+
+        // Required order: transport, artwork, filename, then optional metadata columns.
+        table.getColumns().add(transportColumn);
         table.getColumns().add(artworkColumn);
         table.getColumns().add(filenameColumn);
         table.getColumns().add(titleColumn);
@@ -528,6 +570,181 @@ public class SingSongArtworkUI extends Application {
         configureArtworkDragAndDrop(table);
 
         return table;
+    }
+
+    private boolean isCurrentTrack(TrackEntry track) {
+        return track != null && playingTrackPath != null && playingTrackPath.equals(track.getFilePath());
+    }
+
+    private void onTransportClicked(TrackEntry track) {
+        if (track == null) {
+            return;
+        }
+
+        if (isCurrentTrack(track) && mediaPlayer != null) {
+            if (mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+                mediaPlayer.pause();
+            } else {
+                mediaPlayer.play();
+            }
+            updatePlaybackUi();
+            return;
+        }
+
+        startPlayback(track);
+    }
+
+    private void startPlayback(TrackEntry track) {
+        disposeMediaPlayer();
+        playingTrackPath = track.getFilePath();
+
+        try {
+            Media media = new Media(playingTrackPath.toUri().toString());
+            mediaPlayer = new MediaPlayer(media);
+
+            mediaPlayer.setOnReady(() -> {
+                Duration total = mediaPlayer.getTotalDuration();
+                playbackSlider.setMax(Math.max(total.toSeconds(), 0));
+                updatePlaybackUi();
+            });
+
+            mediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+                if (mediaPlayer == null) {
+                    return;
+                }
+                if (!scrubbingPlayback) {
+                    playbackSlider.setValue(newTime.toSeconds());
+                }
+                playbackTimeLabel.setText(formatDuration(newTime) + " / " + formatDuration(mediaPlayer.getTotalDuration()));
+            });
+
+            mediaPlayer.setOnEndOfMedia(() -> {
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                }
+                updatePlaybackUi();
+            });
+
+            mediaPlayer.play();
+            nowPlayingLabel.setText("Now Playing: " + track.getFilename());
+            statusLabel.setText("Playing: " + track.getFilename());
+            updatePlaybackUi();
+        } catch (Exception ex) {
+            statusLabel.setText("Playback error: " + ex.getMessage());
+            disposeMediaPlayer();
+        }
+    }
+
+    private void toggleGlobalPlayback() {
+        if (mediaPlayer == null) {
+            TrackEntry selected = trackTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                startPlayback(selected);
+            } else {
+                statusLabel.setText("Select a track to play.");
+            }
+            return;
+        }
+
+        if (mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+            mediaPlayer.pause();
+        } else {
+            mediaPlayer.play();
+        }
+        updatePlaybackUi();
+    }
+
+    private void stopPlayback() {
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            playbackSlider.setValue(0);
+            updatePlaybackUi();
+        }
+    }
+
+    private void disposeMediaPlayer() {
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.stop();
+                mediaPlayer.dispose();
+            } catch (Exception ignored) {
+                // Ignore dispose edge cases from platform media backends.
+            }
+            mediaPlayer = null;
+        }
+    }
+
+    private void updatePlaybackUi() {
+        if (playbackPlayPauseButton == null) {
+            return;
+        }
+
+        if (mediaPlayer == null) {
+            playbackPlayPauseButton.setText("▶");
+            playbackStopButton.setDisable(true);
+            if (nowPlayingLabel != null && (nowPlayingLabel.getText() == null || nowPlayingLabel.getText().isBlank())) {
+                nowPlayingLabel.setText("Now Playing: -");
+            }
+            if (playbackTimeLabel != null) {
+                playbackTimeLabel.setText("00:00 / 00:00");
+            }
+        } else {
+            playbackPlayPauseButton.setText(mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING ? "⏸" : "▶");
+            playbackStopButton.setDisable(false);
+        }
+
+        if (trackTable != null) {
+            trackTable.refresh();
+        }
+    }
+
+    private String formatDuration(Duration duration) {
+        if (duration == null || duration.isUnknown() || duration.lessThanOrEqualTo(Duration.ZERO)) {
+            return "00:00";
+        }
+        int totalSeconds = (int) Math.floor(duration.toSeconds());
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+        return String.format("%02d:%02d", minutes, seconds);
+    }
+
+    private HBox createPlaybackBar() {
+        nowPlayingLabel = new Label("Now Playing: -");
+        playbackTimeLabel = new Label("00:00 / 00:00");
+
+        playbackPlayPauseButton = new Button("▶");
+        playbackPlayPauseButton.setOnAction(e -> toggleGlobalPlayback());
+
+        playbackStopButton = new Button("■");
+        playbackStopButton.setOnAction(e -> stopPlayback());
+        playbackStopButton.setDisable(true);
+
+        playbackSlider = new Slider(0, 0, 0);
+        playbackSlider.setPrefWidth(320);
+        playbackSlider.setOnMousePressed(e -> scrubbingPlayback = true);
+        playbackSlider.setOnMouseReleased(e -> {
+            if (mediaPlayer != null) {
+                mediaPlayer.seek(Duration.seconds(playbackSlider.getValue()));
+            }
+            scrubbingPlayback = false;
+        });
+
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox playbackBar = new HBox(10);
+        playbackBar.getStyleClass().add("status-bar");
+        playbackBar.setPadding(new Insets(8, 14, 8, 14));
+        playbackBar.setAlignment(Pos.CENTER_LEFT);
+        playbackBar.getChildren().addAll(nowPlayingLabel, spacer, playbackSlider, playbackTimeLabel, playbackPlayPauseButton, playbackStopButton);
+        return playbackBar;
+    }
+
+    private VBox createBottomPanel() {
+        VBox bottom = new VBox();
+        bottom.getChildren().add(createPlaybackBar());
+        bottom.getChildren().add(createStatusBar());
+        return bottom;
     }
 
     private void applyColumnMode() {
@@ -1079,4 +1296,6 @@ public class SingSongArtworkUI extends Application {
         launch(args);
     }
 }
+
+
 
