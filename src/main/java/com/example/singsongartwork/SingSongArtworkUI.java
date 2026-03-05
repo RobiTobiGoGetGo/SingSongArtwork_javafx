@@ -67,11 +67,9 @@ public class SingSongArtworkUI extends Application {
 
         primaryStage.show();
 
-        // Auto-open directory chooser after window is shown (use Platform.runLater to ensure window is ready)
+        // ALWAYS auto-open directory chooser on startup (user must explicitly choose directory)
         Platform.runLater(() -> {
-            if (currentDirectory == null) {
-                openDirectoryChooser();
-            }
+            openDirectoryChooser();
         });
     }
 
