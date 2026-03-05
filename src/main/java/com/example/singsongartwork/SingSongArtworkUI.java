@@ -59,6 +59,10 @@ public class SingSongArtworkUI extends Application {
     private boolean moreColumnsMode = false; // default: Less mode
     private boolean adminMode = false; // default: User mode
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
+    private static final String KEY_LAST_DIRECTORY = "last.directory";
+    private static final String KEY_LAST_ARTWORK_DIRECTORY = "last.artwork.directory";
+    private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
+    private static final String KEY_UI_ROLE = "ui.role";
 
     // Phase 3: Artwork cache and in-flight tracking for lazy loading
     private final Map<Path, byte[]> artworkBytesCache = new ConcurrentHashMap<>();
@@ -67,6 +71,7 @@ public class SingSongArtworkUI extends Application {
     @Override
     public void start(Stage primaryStage) {
         service = new Mp3MetadataService();
+        initializeUiPreferences();
 
         // Main layout
         BorderPane root = new BorderPane();
@@ -129,16 +134,19 @@ public class SingSongArtworkUI extends Application {
         ToggleGroup columnModeGroup = new ToggleGroup();
         RadioMenuItem lessColumnsItem = new RadioMenuItem("Less");
         lessColumnsItem.setToggleGroup(columnModeGroup);
-        lessColumnsItem.setSelected(true);
+        lessColumnsItem.setSelected(!moreColumnsMode);
         lessColumnsItem.setOnAction(e -> {
             moreColumnsMode = false;
             applyColumnMode();
+            saveUiPreferences();
         });
         RadioMenuItem moreColumnsItem = new RadioMenuItem("More");
         moreColumnsItem.setToggleGroup(columnModeGroup);
+        moreColumnsItem.setSelected(moreColumnsMode);
         moreColumnsItem.setOnAction(e -> {
             moreColumnsMode = true;
             applyColumnMode();
+            saveUiPreferences();
         });
         columnModeMenu.getItems().addAll(lessColumnsItem, moreColumnsItem);
 
@@ -147,19 +155,22 @@ public class SingSongArtworkUI extends Application {
         ToggleGroup roleGroup = new ToggleGroup();
         RadioMenuItem userRoleItem = new RadioMenuItem("User");
         userRoleItem.setToggleGroup(roleGroup);
-        userRoleItem.setSelected(true);
+        userRoleItem.setSelected(!adminMode);
         userRoleItem.setOnAction(e -> {
             adminMode = false;
             refreshContextMenuForRole();
+            saveUiPreferences();
             if (statusLabel != null) {
                 statusLabel.setText("Role switched to User mode");
             }
         });
         RadioMenuItem adminRoleItem = new RadioMenuItem("Admin");
         adminRoleItem.setToggleGroup(roleGroup);
+        adminRoleItem.setSelected(adminMode);
         adminRoleItem.setOnAction(e -> {
             adminMode = true;
             refreshContextMenuForRole();
+            saveUiPreferences();
             if (statusLabel != null) {
                 statusLabel.setText("Role switched to Admin mode");
             }
@@ -951,14 +962,8 @@ public class SingSongArtworkUI extends Application {
     private void saveLastDirectory(Path directory) {
         try {
             ensureConfigDirectory();
-            Properties props = new Properties();
-            props.setProperty("last.directory", directory.toString());
-
-            // Also load and preserve last artwork directory if it exists
-            Path lastArtworkDir = getLastArtworkDirectory();
-            if (lastArtworkDir != null) {
-                props.setProperty("last.artwork.directory", lastArtworkDir.toString());
-            }
+            Properties props = loadConfigProperties();
+            props.setProperty(KEY_LAST_DIRECTORY, directory.toString());
 
             try (var out = Files.newOutputStream(CONFIG_FILE)) {
                 props.store(out, "SingSongArtwork Configuration");
@@ -971,21 +976,12 @@ public class SingSongArtworkUI extends Application {
     private void saveLastArtworkDirectory(Path directory) {
         try {
             ensureConfigDirectory();
-            Properties props = new Properties();
+            Properties props = loadConfigProperties();
 
-            // Load existing properties
-            if (Files.exists(CONFIG_FILE)) {
-                try (var in = Files.newInputStream(CONFIG_FILE)) {
-                    props.load(in);
-                }
-            }
-
-            // Update artwork directory
             if (directory != null) {
-                props.setProperty("last.artwork.directory", directory.toString());
+                props.setProperty(KEY_LAST_ARTWORK_DIRECTORY, directory.toString());
             }
 
-            // Save
             try (var out = Files.newOutputStream(CONFIG_FILE)) {
                 props.store(out, "SingSongArtwork Configuration");
             }
@@ -997,11 +993,8 @@ public class SingSongArtworkUI extends Application {
     private Path getLastArtworkDirectory() {
         try {
             if (Files.exists(CONFIG_FILE)) {
-                Properties props = new Properties();
-                try (var in = Files.newInputStream(CONFIG_FILE)) {
-                    props.load(in);
-                }
-                String lastArtworkDir = props.getProperty("last.artwork.directory");
+                Properties props = loadConfigProperties();
+                String lastArtworkDir = props.getProperty(KEY_LAST_ARTWORK_DIRECTORY);
                 if (lastArtworkDir != null && !lastArtworkDir.isBlank()) {
                     Path lastPath = Paths.get(lastArtworkDir);
                     if (Files.isDirectory(lastPath)) {
@@ -1009,7 +1002,7 @@ public class SingSongArtworkUI extends Application {
                     }
                 }
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             // Silently ignore
         }
         return null;
@@ -1018,21 +1011,17 @@ public class SingSongArtworkUI extends Application {
     private void initializeLastDirectoryPath() {
         try {
             if (Files.exists(CONFIG_FILE)) {
-                Properties props = new Properties();
-                try (var in = Files.newInputStream(CONFIG_FILE)) {
-                    props.load(in);
-                }
-                String lastDir = props.getProperty("last.directory");
+                Properties props = loadConfigProperties();
+                String lastDir = props.getProperty(KEY_LAST_DIRECTORY);
                 if (lastDir != null && !lastDir.isBlank()) {
                     Path lastPath = Paths.get(lastDir);
                     if (Files.isDirectory(lastPath)) {
                         currentDirectory = lastPath;
                         dirLabel.setText(lastPath.toString());
-                        // Note: We only set the path, but don't load the tracks
                     }
                 }
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             // Silently ignore - it's okay if there's no config file yet
         }
     }
@@ -1042,6 +1031,45 @@ public class SingSongArtworkUI extends Application {
         if (!Files.exists(configDir)) {
             Files.createDirectories(configDir);
         }
+    }
+
+    private void saveUiPreferences() {
+        try {
+            ensureConfigDirectory();
+            Properties props = loadConfigProperties();
+            props.setProperty(KEY_UI_COLUMN_MODE, moreColumnsMode ? "more" : "less");
+            props.setProperty(KEY_UI_ROLE, adminMode ? "admin" : "user");
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            if (statusLabel != null) {
+                statusLabel.setText("Warning: Could not save UI preferences: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void initializeUiPreferences() {
+        Properties props = loadConfigProperties();
+        String columnMode = props.getProperty(KEY_UI_COLUMN_MODE, "less").trim().toLowerCase();
+        moreColumnsMode = "more".equals(columnMode);
+
+        String role = props.getProperty(KEY_UI_ROLE, "user").trim().toLowerCase();
+        adminMode = "admin".equals(role);
+    }
+
+    private Properties loadConfigProperties() {
+        Properties props = new Properties();
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                try (var in = Files.newInputStream(CONFIG_FILE)) {
+                    props.load(in);
+                }
+            }
+        } catch (IOException ex) {
+            // Silently ignore
+        }
+        return props;
     }
 
     public static void main(String[] args) {
