@@ -7,7 +7,11 @@ echo Starting SingSongArtwork GUI...
 echo Please wait...
 
 REM Run with Maven which handles all dependencies and modules correctly
-mvn clean javafx:run
+mvn javafx:run
 
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo Application failed to start. Check console output above for errors.
+)
 pause
 

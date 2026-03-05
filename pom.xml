@@ -68,6 +68,10 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>com.example.singsongartwork.SingSongArtworkUI</mainClass>
+                    <options>
+                        <option>--add-modules</option>
+                        <option>javafx.controls,javafx.fxml,javafx.media</option>
+                    </options>
                 </configuration>
             </plugin>
             <plugin>
@@ -76,7 +80,10 @@
                 <version>3.5.0</version>
                 <configuration>
                     <mainClass>com.example.singsongartwork.SingSongArtworkUI</mainClass>
-                    <arguments></arguments>
+                    <arguments>
+                        <argument>--add-modules</argument>
+                        <argument>javafx.controls,javafx.fxml,javafx.media</argument>
+                    </arguments>
                 </configuration>
             </plugin>
         </plugins>

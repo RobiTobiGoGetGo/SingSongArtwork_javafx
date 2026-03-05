@@ -7,6 +7,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -28,13 +29,13 @@ import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.nio.file.StandardCopyOption;
 
 public class SingSongArtworkUI extends Application {
     private Mp3MetadataService service;
@@ -65,7 +67,7 @@ public class SingSongArtworkUI extends Application {
     private Slider playbackSlider;
     private Button playbackPlayPauseButton;
     private Button playbackStopButton;
-    private MediaPlayer mediaPlayer;
+    private Object mediaPlayer;
     private Path playingTrackPath;
     private boolean scrubbingPlayback;
     private boolean moreColumnsMode = false; // default: Less mode
@@ -73,12 +75,19 @@ public class SingSongArtworkUI extends Application {
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
     private static final String KEY_LAST_DIRECTORY = "last.directory";
     private static final String KEY_LAST_ARTWORK_DIRECTORY = "last.artwork.directory";
+    private static final String KEY_LAST_COPY_DESTINATION = "last.copy.destination";
     private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
     private static final String KEY_UI_ROLE = "ui.role";
 
     // Phase 3: Artwork cache and in-flight tracking for lazy loading
     private final Map<Path, byte[]> artworkBytesCache = new ConcurrentHashMap<>();
     private final Set<Path> artworkLoadsInFlight = ConcurrentHashMap.newKeySet();
+    private static final PseudoClass PLAYING_ROW_PSEUDO_CLASS = PseudoClass.getPseudoClass("playing");
+
+    // Mark/Unmark feature
+    private TableColumn<TrackEntry, Boolean> markColumn;
+    private final Set<Path> markedTrackPaths = ConcurrentHashMap.newKeySet();
+    private boolean showMarkedOnly = false;
 
     @Override
     public void start(Stage primaryStage) {
@@ -99,10 +108,13 @@ public class SingSongArtworkUI extends Application {
 
         // Hamburger menu (☰)
         String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 12px; -fx-font-weight: normal; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
+        String menuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
+
         MenuButton helpMenu = new MenuButton("☰");
         helpMenu.setStyle(topIconStyle);
         helpMenu.getStyleClass().add("icon-menu-button");
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
+        shortcutsItem.setStyle(menuItemStyle);
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
         helpMenu.getItems().add(shortcutsItem);
 
@@ -117,12 +129,12 @@ public class SingSongArtworkUI extends Application {
 
         // Directory info as menu label (non-clickable)
         CustomMenuItem dirMenuItem = new CustomMenuItem();
-        VBox dirInfo = new VBox(4);
-        dirInfo.setPadding(new Insets(8, 12, 8, 12));
+        VBox dirInfo = new VBox(3);
+        dirInfo.setPadding(new Insets(6, 12, 6, 12));
         Label dirTitleLabel = new Label("Current Directory:");
-        dirTitleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+        dirTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
         dirLabel = new Label("No directory selected");
-        dirLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #ffffff;");
+        dirLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
         dirLabel.setWrapText(true);
         dirLabel.setMaxWidth(300);
         dirInfo.getChildren().addAll(dirTitleLabel, dirLabel);
@@ -132,9 +144,11 @@ public class SingSongArtworkUI extends Application {
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
 
         MenuItem browseItem = new MenuItem("Browse Directory...");
+        browseItem.setStyle(menuItemStyle);
         browseItem.setOnAction(e -> openDirectoryChooser());
 
         MenuItem reloadItem = new MenuItem("Reload Directory");
+        reloadItem.setStyle(menuItemStyle);
         reloadItem.setOnAction(e -> {
             if (currentDirectory != null) {
                 loadTracksAsync(currentDirectory);
@@ -143,10 +157,30 @@ public class SingSongArtworkUI extends Application {
 
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
 
+        CheckMenuItem showMarkedOnlyItem = new CheckMenuItem("Show Marked Only");
+        showMarkedOnlyItem.setStyle(menuItemStyle);
+        showMarkedOnlyItem.setSelected(showMarkedOnly);
+        showMarkedOnlyItem.setOnAction(e -> {
+            showMarkedOnly = showMarkedOnlyItem.isSelected();
+            applyFilter();
+        });
+
+        MenuItem copyMarkedItem = new MenuItem("Copy Marked Files To...");
+        copyMarkedItem.setStyle(menuItemStyle);
+        copyMarkedItem.setOnAction(e -> copyMarkedTracksToDirectory());
+
+        MenuItem clearMarkedItem = new MenuItem("Unmark All");
+        clearMarkedItem.setStyle(menuItemStyle);
+        clearMarkedItem.setOnAction(e -> clearMarkedTracks());
+
+        SeparatorMenuItem separator3 = new SeparatorMenuItem();
+
         // Column Mode toggle (default: Less)
         Menu columnModeMenu = new Menu("Column Mode");
+        columnModeMenu.setStyle(menuItemStyle);
         ToggleGroup columnModeGroup = new ToggleGroup();
         RadioMenuItem lessColumnsItem = new RadioMenuItem("Less");
+        lessColumnsItem.setStyle(menuItemStyle);
         lessColumnsItem.setToggleGroup(columnModeGroup);
         lessColumnsItem.setSelected(!moreColumnsMode);
         lessColumnsItem.setOnAction(e -> {
@@ -155,6 +189,7 @@ public class SingSongArtworkUI extends Application {
             saveUiPreferences();
         });
         RadioMenuItem moreColumnsItem = new RadioMenuItem("More");
+        moreColumnsItem.setStyle(menuItemStyle);
         moreColumnsItem.setToggleGroup(columnModeGroup);
         moreColumnsItem.setSelected(moreColumnsMode);
         moreColumnsItem.setOnAction(e -> {
@@ -166,8 +201,10 @@ public class SingSongArtworkUI extends Application {
 
         // Role toggle (default: User) - currently no behavioral effect.
         Menu roleMenu = new Menu("Role");
+        roleMenu.setStyle(menuItemStyle);
         ToggleGroup roleGroup = new ToggleGroup();
         RadioMenuItem userRoleItem = new RadioMenuItem("User");
+        userRoleItem.setStyle(menuItemStyle);
         userRoleItem.setToggleGroup(roleGroup);
         userRoleItem.setSelected(!adminMode);
         userRoleItem.setOnAction(e -> {
@@ -179,6 +216,7 @@ public class SingSongArtworkUI extends Application {
             }
         });
         RadioMenuItem adminRoleItem = new RadioMenuItem("Admin");
+        adminRoleItem.setStyle(menuItemStyle);
         adminRoleItem.setToggleGroup(roleGroup);
         adminRoleItem.setSelected(adminMode);
         adminRoleItem.setOnAction(e -> {
@@ -197,6 +235,10 @@ public class SingSongArtworkUI extends Application {
                 browseItem,
                 reloadItem,
                 separator2,
+                showMarkedOnlyItem,
+                copyMarkedItem,
+                clearMarkedItem,
+                separator3,
                 columnModeMenu,
                 roleMenu
         );
@@ -267,21 +309,28 @@ public class SingSongArtworkUI extends Application {
 
         String shortcuts = """
                 File Operations:
-                  Ctrl+O          Open/Browse Directory
-                  Ctrl+R          Reload Current Directory
+                  Ctrl+O              Open/Browse Directory
+                  Ctrl+R              Reload Current Directory
                 
                 Filter & Search:
-                  Ctrl+F          Focus Filter Field
-                  Ctrl+L          Clear Filter
+                  Ctrl+F              Focus Filter Field
+                  Ctrl+L              Clear Filter
                 
-                Selection & Editing:
-                  Ctrl+C          Copy Filename(s) to Clipboard
-                  Right-click     Context Menu (Replace Artwork, Batch Edit, Copy Filename)
+                Selection & Marking:
+                  M                   Mark Selected Rows
+                  Ctrl+Shift+M        Toggle Show Marked Only
+                  Ctrl+Shift+U        Unmark All Files
+                
+                Clipboard:
+                  Ctrl+C              Copy Filename(s) to Clipboard
                 
                 Table Navigation:
-                  Ctrl+Click      Multi-select tracks
-                  Shift+Click     Select range
-                  Ctrl+A          Select all tracks
+                  Ctrl+Click          Multi-select tracks
+                  Shift+Click         Select range
+                  Ctrl+A              Select all tracks
+                
+                Context Menu:
+                  Right-click         View options for selected tracks
                 
                 Drag & Drop:
                   Drag image onto selected tracks to replace artwork
@@ -290,7 +339,7 @@ public class SingSongArtworkUI extends Application {
         TextArea textArea = new TextArea(shortcuts);
         textArea.setEditable(false);
         textArea.setWrapText(false);
-        textArea.setPrefRowCount(18);
+        textArea.setPrefRowCount(22);
         textArea.setPrefColumnCount(50);
 
         alert.getDialogPane().setContent(textArea);
@@ -309,14 +358,39 @@ public class SingSongArtworkUI extends Application {
 
         Label filterLabel = new Label("Filter:");
 
-        filterTextField = new TextField();
-        filterTextField.setPromptText("Search tracks by filename, title, or artist...");
-        filterTextField.setPrefWidth(400);
-        HBox.setHgrow(filterTextField, Priority.ALWAYS);
+        // Create ComboBox with default filter terms
+        ComboBox<String> filterComboBox = new ComboBox<>();
+        filterComboBox.setEditable(true);
+        filterComboBox.setPrefWidth(400);
+        HBox.setHgrow(filterComboBox, Priority.ALWAYS);
+        filterComboBox.setPromptText("Search tracks or select a default term...");
+
+        // Load default terms into ComboBox
+        Set<String> defaultTerms = SearchFilter.getDefaultFilterTerms();
+        if (!defaultTerms.isEmpty()) {
+            filterComboBox.setItems(FXCollections.observableArrayList(defaultTerms.stream().sorted().toList()));
+        }
+
+        // Get reference to the editor (TextBox inside ComboBox)
+        filterTextField = filterComboBox.getEditor();
         filterTextField.setOnKeyReleased(e -> applyFilter());
 
+        // Trigger filter when user selects a term from dropdown
+        filterComboBox.setOnAction(e -> {
+            String selectedValue = filterComboBox.getValue();
+            if (selectedValue != null && !selectedValue.isBlank()) {
+                // Make sure the editor text is set to the selected value
+                filterTextField.setText(selectedValue);
+                applyFilter();
+            }
+        });
+
         Button clearFilterBtn = new Button("Clear");
-        clearFilterBtn.setOnAction(e -> clearFilter());
+        clearFilterBtn.setOnAction(e -> {
+            filterComboBox.setValue(null);
+            filterTextField.clear();
+            clearFilter();
+        });
 
         // Loading indicator
         loadingIndicator = new ProgressIndicator();
@@ -324,7 +398,7 @@ public class SingSongArtworkUI extends Application {
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
 
-        filterBox.getChildren().addAll(filterLabel, filterTextField, clearFilterBtn, loadingIndicator);
+        filterBox.getChildren().addAll(filterLabel, filterComboBox, clearFilterBtn, loadingIndicator);
 
         vbox.getChildren().add(filterBox);
         return vbox;
@@ -345,6 +419,13 @@ public class SingSongArtworkUI extends Application {
             }
         });
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN), this::copyFilenameToClipboard);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M), () -> setMarkedForSelected(true));
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), () -> {
+            showMarkedOnly = !showMarkedOnly;
+            applyFilter();
+            statusLabel.setText(showMarkedOnly ? "Showing marked only" : "Showing all tracks");
+        });
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), this::clearMarkedTracks);
     }
 
     private void openDirectoryChooser() {
@@ -533,7 +614,7 @@ public class SingSongArtworkUI extends Application {
                 }
 
                 String symbol = "▶";
-                if (isCurrentTrack(item) && mediaPlayer != null && mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+                if (isCurrentTrack(item) && isMediaPlaying()) {
                     symbol = "⏸";
                 }
 
@@ -549,7 +630,49 @@ public class SingSongArtworkUI extends Application {
         transportColumn.setSortable(false);
         transportColumn.setResizable(false);
 
-        // Required order: transport, artwork, filename, then optional metadata columns.
+        markColumn = new TableColumn<>("Mark");
+        markColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(markedTrackPaths.contains(cellData.getValue().getFilePath())));
+        markColumn.setCellFactory(col -> new TableCell<>() {
+            private final CheckBox checkBox = new CheckBox();
+
+            {
+                checkBox.setOnAction(e -> {
+                    TrackEntry track = getTableRow() == null ? null : (TrackEntry) getTableRow().getItem();
+                    if (track == null) {
+                        return;
+                    }
+                    if (checkBox.isSelected()) {
+                        markedTrackPaths.add(track.getFilePath());
+                    } else {
+                        markedTrackPaths.remove(track.getFilePath());
+                    }
+                    if (showMarkedOnly) {
+                        applyFilter();
+                    }
+                    updateSelectionStatus();
+                    if (trackTable != null) {
+                        trackTable.refresh();
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(Boolean marked, boolean empty) {
+                super.updateItem(marked, empty);
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setGraphic(null);
+                    return;
+                }
+                checkBox.setSelected(Boolean.TRUE.equals(marked));
+                setGraphic(checkBox);
+            }
+        });
+        markColumn.setPrefWidth(70);
+        markColumn.setSortable(false);
+        markColumn.setResizable(false);
+
+        // Required order: mark, transport, artwork, filename, then optional metadata columns.
+        table.getColumns().add(markColumn);
         table.getColumns().add(transportColumn);
         table.getColumns().add(artworkColumn);
         table.getColumns().add(filenameColumn);
@@ -569,6 +692,15 @@ public class SingSongArtworkUI extends Application {
         // Enable drag-and-drop artwork replacement.
         configureArtworkDragAndDrop(table);
 
+        table.setRowFactory(tv -> new TableRow<>() {
+            @Override
+            protected void updateItem(TrackEntry item, boolean empty) {
+                super.updateItem(item, empty);
+                boolean isPlayingRow = !empty && item != null && isCurrentTrack(item);
+                pseudoClassStateChanged(PLAYING_ROW_PSEUDO_CLASS, isPlayingRow);
+            }
+        });
+
         return table;
     }
 
@@ -582,10 +714,10 @@ public class SingSongArtworkUI extends Application {
         }
 
         if (isCurrentTrack(track) && mediaPlayer != null) {
-            if (mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
-                mediaPlayer.pause();
+            if (isMediaPlaying()) {
+                invokeMediaPlayerVoid("pause");
             } else {
-                mediaPlayer.play();
+                invokeMediaPlayerVoid("play");
             }
             updatePlaybackUi();
             return;
@@ -599,40 +731,148 @@ public class SingSongArtworkUI extends Application {
         playingTrackPath = track.getFilePath();
 
         try {
-            Media media = new Media(playingTrackPath.toUri().toString());
-            mediaPlayer = new MediaPlayer(media);
+            String mediaSource = toJavaFxMediaUri(playingTrackPath);
+            // Diagnostic output: keep URI visible in UI and console for troubleshooting path issues.
+            statusLabel.setText("Media URI: " + mediaSource);
+            System.out.println("[SingSongArtwork] Media URI: " + mediaSource);
 
-            mediaPlayer.setOnReady(() -> {
-                Duration total = mediaPlayer.getTotalDuration();
+            mediaPlayer = createMediaPlayer(mediaSource);
+
+            invokeMediaPlayerVoid("setOnReady", (Runnable) () -> {
+                Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
                 playbackSlider.setMax(Math.max(total.toSeconds(), 0));
                 updatePlaybackUi();
             });
 
-            mediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
-                if (mediaPlayer == null) {
-                    return;
-                }
-                if (!scrubbingPlayback) {
-                    playbackSlider.setValue(newTime.toSeconds());
-                }
-                playbackTimeLabel.setText(formatDuration(newTime) + " / " + formatDuration(mediaPlayer.getTotalDuration()));
-            });
+            Object currentTimeProperty = invokeMediaPlayer("currentTimeProperty");
+            if (currentTimeProperty instanceof javafx.beans.value.ObservableValue<?> observable) {
+                observable.addListener((obs, oldTime, newTime) -> {
+                    Duration current = safeToDuration(newTime);
+                    Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
+                    if (!scrubbingPlayback) {
+                        playbackSlider.setValue(current.toSeconds());
+                    }
+                    playbackTimeLabel.setText(formatDuration(current) + " / " + formatDuration(total));
+                });
+            }
 
-            mediaPlayer.setOnEndOfMedia(() -> {
-                if (mediaPlayer != null) {
-                    mediaPlayer.stop();
-                }
+            invokeMediaPlayerVoid("setOnEndOfMedia", (Runnable) () -> {
+                invokeMediaPlayerVoid("stop");
                 updatePlaybackUi();
             });
 
-            mediaPlayer.play();
+            invokeMediaPlayerVoid("play");
             nowPlayingLabel.setText("Now Playing: " + track.getFilename());
-            statusLabel.setText("Playing: " + track.getFilename());
+            statusLabel.setText("Playing: " + track.getFilename() + " | URI: " + mediaSource);
             updatePlaybackUi();
         } catch (Exception ex) {
-            statusLabel.setText("Playback error: " + ex.getMessage());
+            statusLabel.setText("Playback error for " + track.getFilename() + ": " + ex.getMessage());
             disposeMediaPlayer();
         }
+    }
+
+    private String toJavaFxMediaUri(Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+
+        // Use Path.toUri() which properly encodes special characters (spaces, umlauts, etc.)
+        URI fileUri = absolute.toUri();
+        String uriString = fileUri.toString();
+
+        // JavaFX Media rejects URIs with authority (file://host/share/...)
+        // UNC paths from Windows come as file://host/share/...
+        // We need to convert to file:////host/share/... (no authority)
+        if (uriString.startsWith("file://") && !uriString.startsWith("file:///")) {
+            // Has authority: file://host/...
+            // Remove "file://" and prepend "file:////" to make it authority-free
+            uriString = "file:////" + uriString.substring("file://".length());
+        }
+
+        return uriString;
+    }
+
+    private boolean isMediaPlaying() {
+        if (mediaPlayer == null) {
+            return false;
+        }
+        Object status = invokeMediaPlayer("getStatus");
+        return status != null && "PLAYING".equals(String.valueOf(status));
+    }
+
+    private Object createMediaPlayer(String mediaSource) {
+        try {
+            Class<?> mediaClass = Class.forName("javafx.scene.media.Media");
+            Object media = mediaClass.getConstructor(String.class).newInstance(mediaSource);
+            Class<?> mediaPlayerClass = Class.forName("javafx.scene.media.MediaPlayer");
+            return mediaPlayerClass.getConstructor(mediaClass).newInstance(media);
+        } catch (ClassNotFoundException ex) {
+            String msg = "JavaFX media module not found. The javafx.media module is not on the module path.";
+            System.err.println("[ERROR] " + msg);
+            ex.printStackTrace();
+            throw new RuntimeException(msg, ex);
+        } catch (java.lang.reflect.InvocationTargetException ex) {
+            String msg = "JavaFX Media failed to initialize: " + ex.getCause();
+            System.err.println("[ERROR] " + msg);
+            ex.getCause().printStackTrace();
+            throw new RuntimeException(msg, ex.getCause());
+        } catch (Exception ex) {
+            String msg = "JavaFX media module error: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
+            System.err.println("[ERROR] " + msg);
+            ex.printStackTrace();
+            throw new RuntimeException(msg, ex);
+        }
+    }
+
+    private Object invokeMediaPlayer(String methodName, Object... args) {
+        if (mediaPlayer == null) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Method method = findCompatibleMethod(mediaPlayer.getClass(), methodName, args);
+            if (method == null) {
+                return null;
+            }
+            return method.invoke(mediaPlayer, args);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private java.lang.reflect.Method findCompatibleMethod(Class<?> type, String methodName, Object[] args) {
+        for (java.lang.reflect.Method method : type.getMethods()) {
+            if (!method.getName().equals(methodName)) {
+                continue;
+            }
+            Class<?>[] paramTypes = method.getParameterTypes();
+            if (paramTypes.length != args.length) {
+                continue;
+            }
+            boolean matches = true;
+            for (int i = 0; i < paramTypes.length; i++) {
+                Object arg = args[i];
+                if (arg == null) {
+                    continue;
+                }
+                if (!paramTypes[i].isAssignableFrom(arg.getClass())) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private void invokeMediaPlayerVoid(String methodName, Object... args) {
+        invokeMediaPlayer(methodName, args);
+    }
+
+    private Duration safeToDuration(Object value) {
+        if (value instanceof Duration d) {
+            return d;
+        }
+        return Duration.ZERO;
     }
 
     private void toggleGlobalPlayback() {
@@ -646,17 +886,17 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        if (mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
-            mediaPlayer.pause();
+        if (isMediaPlaying()) {
+            invokeMediaPlayerVoid("pause");
         } else {
-            mediaPlayer.play();
+            invokeMediaPlayerVoid("play");
         }
         updatePlaybackUi();
     }
 
     private void stopPlayback() {
         if (mediaPlayer != null) {
-            mediaPlayer.stop();
+            invokeMediaPlayerVoid("stop");
             playbackSlider.setValue(0);
             updatePlaybackUi();
         }
@@ -665,8 +905,8 @@ public class SingSongArtworkUI extends Application {
     private void disposeMediaPlayer() {
         if (mediaPlayer != null) {
             try {
-                mediaPlayer.stop();
-                mediaPlayer.dispose();
+                invokeMediaPlayerVoid("stop");
+                invokeMediaPlayerVoid("dispose");
             } catch (Exception ignored) {
                 // Ignore dispose edge cases from platform media backends.
             }
@@ -689,7 +929,7 @@ public class SingSongArtworkUI extends Application {
                 playbackTimeLabel.setText("00:00 / 00:00");
             }
         } else {
-            playbackPlayPauseButton.setText(mediaPlayer.getStatus() == MediaPlayer.Status.PLAYING ? "⏸" : "▶");
+            playbackPlayPauseButton.setText(isMediaPlaying() ? "⏸" : "▶");
             playbackStopButton.setDisable(false);
         }
 
@@ -724,7 +964,7 @@ public class SingSongArtworkUI extends Application {
         playbackSlider.setOnMousePressed(e -> scrubbingPlayback = true);
         playbackSlider.setOnMouseReleased(e -> {
             if (mediaPlayer != null) {
-                mediaPlayer.seek(Duration.seconds(playbackSlider.getValue()));
+                invokeMediaPlayerVoid("seek", Duration.seconds(playbackSlider.getValue()));
             }
             scrubbingPlayback = false;
         });
@@ -852,7 +1092,8 @@ public class SingSongArtworkUI extends Application {
         int selected = trackTable.getSelectionModel().getSelectedItems().size();
         int visible = trackTable.getItems() == null ? 0 : trackTable.getItems().size();
         int total = allTracksUnfiltered == null ? 0 : allTracksUnfiltered.size();
-        selectionLabel.setText("Selected: " + selected + " | Visible: " + visible + " | Total: " + total);
+        int marked = markedTrackPaths.size();
+        selectionLabel.setText("Selected: " + selected + " | Marked: " + marked + " | Visible: " + visible + " | Total: " + total);
     }
 
     private void clearFilter() {
@@ -881,6 +1122,8 @@ public class SingSongArtworkUI extends Application {
 
         // Clear existing data
         allTracksUnfiltered.clear();
+        markedTrackPaths.clear();
+        showMarkedOnly = false;
         artworkBytesCache.clear();
         artworkLoadsInFlight.clear();
         trackTable.setItems(FXCollections.observableArrayList());
@@ -933,15 +1176,10 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void applyFilter() {
-        if (allTracksUnfiltered.isEmpty()) {
-            return;
-        }
-
-        String filterText = filterTextField.getText();
+        String filterText = filterTextField == null ? "" : filterTextField.getText();
 
         try {
-            List<TrackEntry> filtered = SearchFilter.filter(allTracksUnfiltered, filterText);
-
+            List<TrackEntry> filtered = applyActiveFilters(allTracksUnfiltered, filterText);
             trackTable.setItems(FXCollections.observableArrayList(filtered));
             statusLabel.setText("Showing " + filtered.size() + " tracks");
             updateSelectionStatus();
@@ -951,11 +1189,10 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void applyFilterInternal(List<TrackEntry> allTracks) {
-        String filterText = filterTextField.getText();
+        String filterText = filterTextField == null ? "" : filterTextField.getText();
 
         try {
-            List<TrackEntry> filtered = SearchFilter.filter(allTracks, filterText);
-
+            List<TrackEntry> filtered = applyActiveFilters(allTracks, filterText);
             trackTable.setItems(FXCollections.observableArrayList(filtered));
             statusLabel.setText("Showing " + filtered.size() + " tracks");
             updateSelectionStatus();
@@ -964,14 +1201,27 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
+    private List<TrackEntry> applyActiveFilters(List<TrackEntry> source, String filterText) {
+        List<TrackEntry> textFiltered = SearchFilter.filter(source, filterText);
+        if (!showMarkedOnly) {
+            return textFiltered;
+        }
+        return textFiltered.stream()
+                .filter(track -> markedTrackPaths.contains(track.getFilePath()))
+                .toList();
+    }
+
     private ContextMenu createTableContextMenu() {
         ContextMenu contextMenu = new ContextMenu();
+        String contextMenuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
 
         if (adminMode) {
             MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
+            replaceArtworkItem.setStyle(contextMenuItemStyle);
             replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
 
             MenuItem batchEditItem = new MenuItem("Batch Edit Metadata...");
+            batchEditItem.setStyle(contextMenuItemStyle);
             batchEditItem.setOnAction(e -> openBatchEditDialog());
 
             contextMenu.getItems().add(replaceArtworkItem);
@@ -979,11 +1229,110 @@ public class SingSongArtworkUI extends Application {
             contextMenu.getItems().add(new SeparatorMenuItem());
         }
 
+        MenuItem markSelectedItem = new MenuItem("Mark Selected");
+        markSelectedItem.setStyle(contextMenuItemStyle);
+        markSelectedItem.setOnAction(e -> setMarkedForSelected(true));
+
+        MenuItem unmarkSelectedItem = new MenuItem("Unmark Selected");
+        unmarkSelectedItem.setStyle(contextMenuItemStyle);
+        unmarkSelectedItem.setOnAction(e -> setMarkedForSelected(false));
+
+        MenuItem copyMarkedItem = new MenuItem("Copy Marked Files To...");
+        copyMarkedItem.setStyle(contextMenuItemStyle);
+        copyMarkedItem.setOnAction(e -> copyMarkedTracksToDirectory());
+
+        MenuItem clearMarkedItem = new MenuItem("Unmark All");
+        clearMarkedItem.setStyle(contextMenuItemStyle);
+        clearMarkedItem.setOnAction(e -> clearMarkedTracks());
+
         MenuItem copyFilenameItem = new MenuItem("Copy Filename(s)");
+        copyFilenameItem.setStyle(contextMenuItemStyle);
         copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
+
+        contextMenu.getItems().add(markSelectedItem);
+        contextMenu.getItems().add(unmarkSelectedItem);
+        contextMenu.getItems().add(copyMarkedItem);
+        contextMenu.getItems().add(clearMarkedItem);
+        contextMenu.getItems().add(new SeparatorMenuItem());
         contextMenu.getItems().add(copyFilenameItem);
 
         return contextMenu;
+    }
+
+    private void setMarkedForSelected(boolean marked) {
+        ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
+        if (selectedTracks == null || selectedTracks.isEmpty()) {
+            statusLabel.setText("No selected tracks to " + (marked ? "mark" : "unmark"));
+            return;
+        }
+
+        for (TrackEntry track : selectedTracks) {
+            if (marked) {
+                markedTrackPaths.add(track.getFilePath());
+            } else {
+                markedTrackPaths.remove(track.getFilePath());
+            }
+        }
+
+        if (showMarkedOnly) {
+            applyFilter();
+        }
+        trackTable.refresh();
+        updateSelectionStatus();
+        statusLabel.setText((marked ? "Marked " : "Unmarked ") + selectedTracks.size() + " tracks");
+    }
+
+    private void clearMarkedTracks() {
+        int count = markedTrackPaths.size();
+        markedTrackPaths.clear();
+        applyFilter();
+        if (trackTable != null) {
+            trackTable.refresh();
+        }
+        updateSelectionStatus();
+        statusLabel.setText("Unmarked " + count + " tracks");
+    }
+
+    private void copyMarkedTracksToDirectory() {
+        if (markedTrackPaths.isEmpty()) {
+            statusLabel.setText("No marked tracks to copy");
+            return;
+        }
+
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Choose Destination Directory for Bulk Copy");
+
+        // Use last copy destination if available, otherwise fall back to current directory
+        Path lastCopyDest = getLastCopyDestination();
+        if (lastCopyDest != null && Files.isDirectory(lastCopyDest)) {
+            chooser.setInitialDirectory(lastCopyDest.toFile());
+        } else if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
+            chooser.setInitialDirectory(currentDirectory.toFile());
+        }
+
+        File selected = chooser.showDialog(null);
+        if (selected == null) {
+            return;
+        }
+
+        Path destinationDir = selected.toPath();
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (Path sourcePath : markedTrackPaths) {
+            try {
+                Path targetPath = destinationDir.resolve(sourcePath.getFileName());
+                Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                successCount++;
+            } catch (Exception ex) {
+                failureCount++;
+            }
+        }
+
+        // Save the destination directory for next time
+        saveLastCopyDestination(destinationDir);
+
+        statusLabel.setText("Copied marked files: " + successCount + " succeeded, " + failureCount + " failed");
     }
 
     private void refreshContextMenuForRole() {
@@ -999,13 +1348,11 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        // Collect filenames
         String filenames = selectedTracks.stream()
                 .map(TrackEntry::getFilename)
                 .reduce((a, b) -> a + "\n" + b)
                 .orElse("");
 
-        // Copy to clipboard
         ClipboardContent content = new ClipboardContent();
         content.putString(filenames);
         Clipboard.getSystemClipboard().setContent(content);
@@ -1032,14 +1379,12 @@ public class SingSongArtworkUI extends Application {
                 new FileChooser.ExtensionFilter("All Files", "*.*")
         );
 
-        // Set initial directory to last used artwork directory
         Path lastArtworkDir = getLastArtworkDirectory();
         if (lastArtworkDir != null && Files.isDirectory(lastArtworkDir)) {
             chooser.setInitialDirectory(lastArtworkDir.toFile());
         }
 
         File imageFile = chooser.showOpenDialog(null);
-
         if (imageFile != null) {
             saveLastArtworkDirectory(imageFile.toPath().getParent());
             applyArtworkToTracks(new ArrayList<>(selectedTracks), imageFile.toPath(), "picker");
@@ -1064,20 +1409,16 @@ public class SingSongArtworkUI extends Application {
 
         statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
 
-        // Reload modified tracks from disk to get updated metadata
         Task<Void> refreshTask = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected Void call() {
                 for (Path modifiedPath : modifiedPaths) {
-                    // Invalidate cache and reload
                     service.invalidateCache(modifiedPath);
                     artworkBytesCache.remove(modifiedPath);
                     artworkLoadsInFlight.remove(modifiedPath);
 
-                    // Load fresh track entry from disk
                     TrackEntry reloadedTrack = service.loadSingleTrack(modifiedPath);
                     if (reloadedTrack != null) {
-                        // Find and update the entry in allTracksUnfiltered
                         for (int i = 0; i < allTracksUnfiltered.size(); i++) {
                             if (allTracksUnfiltered.get(i).getFilePath().equals(modifiedPath)) {
                                 allTracksUnfiltered.set(i, reloadedTrack);
@@ -1139,26 +1480,21 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        List<Path> paths = selectedTracks.stream()
-                .map(track -> currentDirectory.resolve(track.getFilename()))
-                .toList();
+        List<Path> paths = selectedTracks.stream().map(track -> currentDirectory.resolve(track.getFilename())).toList();
         int updated = service.batchEditMetadata(paths, newTitle, newArtist);
         statusLabel.setText("Batch metadata edit updated " + updated + " tracks.");
 
-        // Invalidate cache for modified files and refresh them
         for (Path path : paths) {
             service.invalidateCache(path);
         }
 
-        // Reload only the modified tracks by reloading them from disk
         Task<Void> refreshTask = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected Void call() {
                 for (TrackEntry track : selectedTracks) {
                     Path mp3Path = currentDirectory.resolve(track.getFilename());
                     TrackEntry reloadedTrack = service.loadSingleTrack(mp3Path);
                     if (reloadedTrack != null) {
-                        // Update the entry in allTracksUnfiltered
                         int idx = allTracksUnfiltered.indexOf(track);
                         if (idx >= 0) {
                             allTracksUnfiltered.set(idx, reloadedTrack);
@@ -1228,6 +1564,41 @@ public class SingSongArtworkUI extends Application {
         return null;
     }
 
+    private void saveLastCopyDestination(Path directory) {
+        try {
+            ensureConfigDirectory();
+            Properties props = loadConfigProperties();
+
+            if (directory != null) {
+                props.setProperty(KEY_LAST_COPY_DESTINATION, directory.toString());
+            }
+
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            statusLabel.setText("Warning: Could not save copy destination preference: " + ex.getMessage());
+        }
+    }
+
+    private Path getLastCopyDestination() {
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = loadConfigProperties();
+                String lastCopyDest = props.getProperty(KEY_LAST_COPY_DESTINATION);
+                if (lastCopyDest != null && !lastCopyDest.isBlank()) {
+                    Path lastPath = Paths.get(lastCopyDest);
+                    if (Files.isDirectory(lastPath)) {
+                        return lastPath;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Silently ignore
+        }
+        return null;
+    }
+
     private void initializeLastDirectoryPath() {
         try {
             if (Files.exists(CONFIG_FILE)) {
@@ -1242,7 +1613,7 @@ public class SingSongArtworkUI extends Application {
                 }
             }
         } catch (Exception ex) {
-            // Silently ignore - it's okay if there's no config file yet
+            // Silently ignore
         }
     }
 
@@ -1296,6 +1667,3 @@ public class SingSongArtworkUI extends Application {
         launch(args);
     }
 }
-
-
-

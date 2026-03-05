@@ -63,7 +63,7 @@
     -fx-cursor: hand;
 }
 
-.menu-button.icon-menu-button .label {
+.menu-button.icon-menu-button > .label {
     -fx-text-fill: #ffffff !important;
     -fx-font-size: 24px !important;
     -fx-font-weight: bold !important;
@@ -297,6 +297,17 @@
     -fx-text-fill: #00f5ff;
 }
 
+/* Playing row style */
+.table-row-cell:playing {
+    -fx-background-color: rgba(0, 217, 255, 0.16);
+    -fx-border-color: transparent transparent #00d9ff transparent;
+    -fx-border-width: 0 0 2px 0;
+}
+
+.table-row-cell:playing .table-cell {
+    -fx-text-fill: #00f5ff;
+}
+
 .table-view .filler {
     -fx-background-color: #181818;
 }
@@ -431,4 +442,96 @@
 /* === SELECTION HIGHLIGHT === */
 .table-view:focused .table-row-cell:selected {
     -fx-background-color: #00d9ff44;
+}
+
+/* === CONTEXT MENU & MENU ITEMS === */
+.context-menu {
+    -fx-background-color: #282828;
+    -fx-border-color: #404040;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 4px;
+}
+
+/* All menu items - regular, radio, checkbox, and custom */
+.menu-item,
+.radio-menu-item,
+.check-menu-item,
+.custom-menu-item,
+.menu .label {
+    -fx-background-color: transparent;
+    -fx-text-fill: #ffffff;
+    -fx-padding: 4px 12px !important;
+    -fx-font-size: 11px !important;
+}
+
+.menu-item .label,
+.radio-menu-item .label,
+.check-menu-item .label,
+.custom-menu-item .label {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 11px !important;
+    -fx-padding: 0;
+}
+
+.menu-item:hover,
+.radio-menu-item:hover,
+.check-menu-item:hover {
+    -fx-background-color: #383838;
+}
+
+.menu-item:focused,
+.radio-menu-item:focused,
+.check-menu-item:focused {
+    -fx-background-color: #383838;
+}
+
+/* Submenus */
+.menu {
+    -fx-background-color: transparent;
+    -fx-padding: 4px 12px !important;
+}
+
+.menu .label {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 11px !important;
+}
+
+.menu:hover {
+    -fx-background-color: #383838;
+}
+
+.menu:showing {
+    -fx-background-color: #383838;
+}
+
+/* Separator */
+.separator-menu-item .line {
+    -fx-border-color: #404040;
+    -fx-border-width: 1px 0 0 0;
+    -fx-padding: 2px 0;
+}
+
+/* Menu item accelerator text (keyboard shortcuts) */
+.menu-item .accelerator-text {
+    -fx-fill: #b3b3b3;
+    -fx-font-size: 10px !important;
+}
+
+/* Strong popup menu sizing override (hamburger + three-dot + context menus) */
+.context-menu .menu-item .label,
+.context-menu .radio-menu-item .label,
+.context-menu .check-menu-item .label,
+.context-menu .custom-menu-item .label,
+.context-menu .menu .label {
+    -fx-font-size: 11px !important;
+}
+
+.context-menu .menu-item,
+.context-menu .radio-menu-item,
+.context-menu .check-menu-item,
+.context-menu .custom-menu-item,
+.context-menu .menu {
+    -fx-padding: 4px 12px !important;
 }
