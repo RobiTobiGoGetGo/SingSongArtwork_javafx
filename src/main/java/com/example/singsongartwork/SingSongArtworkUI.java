@@ -425,20 +425,40 @@ public class SingSongArtworkUI extends Application {
     private void loadTracksAsync(Path directory) {
         setLoadingState(true, "Loading MP3 files from: " + directory + " ...");
 
-        Task<List<TrackEntry>> loadTask = new Task<>() {
+        // Clear existing data
+        allTracksUnfiltered.clear();
+        artworkBytesCache.clear();
+        artworkLoadsInFlight.clear();
+        trackTable.setItems(FXCollections.observableArrayList());
+
+        Task<Void> loadTask = new Task<>() {
             @Override
-            protected List<TrackEntry> call() throws Exception {
-                return service.loadFromDirectory(directory);
+            protected Void call() throws Exception {
+                try (var stream = java.nio.file.Files.list(directory)) {
+                    stream.filter(path -> !java.nio.file.Files.isDirectory(path))
+                          .filter(path -> path.toString().toLowerCase().endsWith(".mp3"))
+                          .forEach(mp3Path -> {
+                              try {
+                                  TrackEntry track = service.loadSingleTrack(mp3Path);
+                                  if (track != null) {
+                                      // Update UI on JavaFX thread
+                                      Platform.runLater(() -> {
+                                          allTracksUnfiltered.add(track);
+                                          applyFilterInternal(new ArrayList<>(allTracksUnfiltered));
+                                          updateSelectionStatus();
+                                      });
+                                  }
+                              } catch (Exception ex) {
+                                  // Skip problematic files but continue loading
+                              }
+                          });
+                }
+                return null;
             }
         };
 
         loadTask.setOnSucceeded(e -> {
-            List<TrackEntry> tracks = loadTask.getValue();
-            allTracksUnfiltered = new ArrayList<>(tracks);
-            artworkBytesCache.clear();
-            artworkLoadsInFlight.clear();
-            applyFilterInternal(tracks);
-            statusLabel.setText("Loaded " + tracks.size() + " MP3 files from: " + directory);
+            statusLabel.setText("Loaded " + allTracksUnfiltered.size() + " MP3 files from: " + directory);
             updateSelectionStatus();
             setLoadingState(false, null);
         });
