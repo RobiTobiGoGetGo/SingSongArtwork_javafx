@@ -14,10 +14,14 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Mp3MetadataService {
+    private final Map<Path, CachedTrackMetadata> metadataCache = new ConcurrentHashMap<>();
+
     public List<TrackEntry> loadFromDirectory(Path directory) throws IOException {
         if (!Files.exists(directory) || !Files.isDirectory(directory)) {
             throw new IllegalArgumentException("Directory does not exist: " + directory);
@@ -64,6 +68,50 @@ public class Mp3MetadataService {
         Artwork artwork = ArtworkFactory.createArtworkFromFile(artworkFile.toFile());
         replaceArtworkInTag(tag, artwork);
         audioFile.commit();
+        invalidateCache(mp3File);
+    }
+
+    public byte[] loadArtworkBytes(Path mp3Path) {
+        try {
+            AudioFile audioFile = AudioFileIO.read(mp3Path.toFile());
+            Tag tag = audioFile.getTag();
+            if (tag == null) {
+                return new byte[0];
+            }
+            Artwork firstArtwork = tag.getFirstArtwork();
+            if (firstArtwork == null || firstArtwork.getBinaryData() == null) {
+                return new byte[0];
+            }
+            return firstArtwork.getBinaryData();
+        } catch (Exception ex) {
+            return new byte[0];
+        }
+    }
+
+    public int batchEditMetadata(List<Path> mp3Paths, String newTitle, String newArtist) {
+        int updated = 0;
+        for (Path path : mp3Paths) {
+            try {
+                AudioFile audioFile = AudioFileIO.read(path.toFile());
+                Tag tag = audioFile.getTagOrCreateAndSetDefault();
+                if (newTitle != null && !newTitle.isBlank()) {
+                    tag.setField(FieldKey.TITLE, newTitle.trim());
+                }
+                if (newArtist != null && !newArtist.isBlank()) {
+                    tag.setField(FieldKey.ARTIST, newArtist.trim());
+                }
+                audioFile.commit();
+                invalidateCache(path);
+                updated++;
+            } catch (Exception ignored) {
+                // Keep best-effort batch behavior for mixed-quality libraries.
+            }
+        }
+        return updated;
+    }
+
+    public void clearCache() {
+        metadataCache.clear();
     }
 
     void replaceArtworkInTag(Tag tag, Artwork artwork) throws Exception {
@@ -73,27 +121,36 @@ public class Mp3MetadataService {
 
     private TrackEntry loadTrackSafely(Path path) {
         try {
+            long lastModified = Files.getLastModifiedTime(path).toMillis();
+            CachedTrackMetadata cached = metadataCache.get(path);
+            if (cached != null && cached.lastModified == lastModified) {
+                return cached.entry;
+            }
+
             AudioFile audioFile = AudioFileIO.read(path.toFile());
             Tag tag = audioFile.getTag();
 
             String title = "";
             String artist = "";
-            byte[] artwork = new byte[0];
+            boolean hasArtwork = false;
 
             if (tag != null) {
                 title = sanitizeTagValue(tag.getFirst(FieldKey.TITLE));
                 artist = sanitizeTagValue(tag.getFirst(FieldKey.ARTIST));
-                Artwork firstArtwork = tag.getFirstArtwork();
-                if (firstArtwork != null && firstArtwork.getBinaryData() != null) {
-                    artwork = firstArtwork.getBinaryData();
-                }
+                hasArtwork = tag.getFirstArtwork() != null;
             }
 
-            return new TrackEntry(path, title, artist, artwork);
+            // Keep artwork bytes empty in directory scans and lazy-load on demand.
+            TrackEntry entry = new TrackEntry(path, title, artist, new byte[0], hasArtwork);
+            metadataCache.put(path, new CachedTrackMetadata(lastModified, entry));
+            return entry;
         } catch (Exception ex) {
-            // Keep scanning robust even if an individual file has malformed tags.
             return new TrackEntry(path, "", "", new byte[0]);
         }
+    }
+
+    private void invalidateCache(Path mp3Path) {
+        metadataCache.remove(mp3Path);
     }
 
     private String sanitizeTagValue(String value) {
@@ -103,5 +160,15 @@ public class Mp3MetadataService {
     private boolean isMp3(Path file) {
         String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
         return name.endsWith(".mp3");
+    }
+
+    private static final class CachedTrackMetadata {
+        private final long lastModified;
+        private final TrackEntry entry;
+
+        private CachedTrackMetadata(long lastModified, TrackEntry entry) {
+            this.lastModified = lastModified;
+            this.entry = entry;
+        }
     }
 }

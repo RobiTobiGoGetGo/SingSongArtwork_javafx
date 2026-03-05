@@ -11,13 +11,19 @@ public final class TrackEntry {
     private final String title;
     private final String artist;
     private final byte[] artwork;
+    private final Boolean hasArtworkHint;
 
     public TrackEntry(Path filePath, String title, String artist, byte[] artwork) {
+        this(filePath, title, artist, artwork, null);
+    }
+
+    public TrackEntry(Path filePath, String title, String artist, byte[] artwork, Boolean hasArtworkHint) {
         this.filePath = Objects.requireNonNull(filePath, "filePath must not be null");
         this.filename = filePath.getFileName().toString();
         this.title = sanitize(title);
         this.artist = sanitize(artist);
         this.artwork = artwork == null ? new byte[0] : Arrays.copyOf(artwork, artwork.length);
+        this.hasArtworkHint = hasArtworkHint;
     }
 
     public Path getFilePath() {
@@ -41,7 +47,14 @@ public final class TrackEntry {
     }
 
     public boolean hasArtwork() {
-        return artwork.length > 0;
+        if (artwork.length > 0) {
+            return true;
+        }
+        return hasArtworkHint != null && hasArtworkHint;
+    }
+
+    public TrackEntry withArtwork(byte[] artworkBytes) {
+        return new TrackEntry(filePath, title, artist, artworkBytes, artworkBytes != null && artworkBytes.length > 0);
     }
 
     public String artworkDisplayValue() {
@@ -63,4 +76,3 @@ public final class TrackEntry {
         return value == null ? "" : value.trim();
     }
 }
-

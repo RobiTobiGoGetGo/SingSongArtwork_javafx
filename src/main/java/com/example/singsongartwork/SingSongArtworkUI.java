@@ -16,6 +16,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -32,7 +34,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SingSongArtworkUI extends Application {
     private Mp3MetadataService service;
@@ -46,6 +51,10 @@ public class SingSongArtworkUI extends Application {
     private Path currentDirectory;
     private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
+
+    // Phase 3: Artwork cache and in-flight tracking for lazy loading
+    private final Map<Path, byte[]> artworkBytesCache = new ConcurrentHashMap<>();
+    private final Set<Path> artworkLoadsInFlight = ConcurrentHashMap.newKeySet();
 
     @Override
     public void start(Stage primaryStage) {
@@ -240,8 +249,16 @@ public class SingSongArtworkUI extends Application {
                     return;
                 }
 
+                byte[] artworkBytes = getArtworkBytesForItem(item);
+                if (artworkBytes.length == 0) {
+                    setText("yes");
+                    setGraphic(null);
+                    triggerArtworkLazyLoad(item);
+                    return;
+                }
+
                 try {
-                    Image image = new Image(new ByteArrayInputStream(item.getArtwork()), 32, 32, true, true);
+                    Image image = new Image(new ByteArrayInputStream(artworkBytes), 32, 32, true, true);
                     if (image.isError()) {
                         setText("yes");
                         setGraphic(null);
@@ -277,7 +294,82 @@ public class SingSongArtworkUI extends Application {
         table.getSelectionModel().getSelectedItems().addListener((ListChangeListener<TrackEntry>) change -> updateSelectionStatus());
         table.itemsProperty().addListener((obs, oldItems, newItems) -> updateSelectionStatus());
 
+        // Enable drag-and-drop artwork replacement.
+        configureArtworkDragAndDrop(table);
+
         return table;
+    }
+
+    private byte[] getArtworkBytesForItem(TrackEntry item) {
+        byte[] embedded = item.getArtwork();
+        if (embedded.length > 0) {
+            return embedded;
+        }
+        return artworkBytesCache.getOrDefault(item.getFilePath(), new byte[0]);
+    }
+
+    private void triggerArtworkLazyLoad(TrackEntry item) {
+        Path path = item.getFilePath();
+        if (!item.hasArtwork() || artworkBytesCache.containsKey(path) || !artworkLoadsInFlight.add(path)) {
+            return;
+        }
+
+        Task<byte[]> loadArtworkTask = new Task<>() {
+            @Override
+            protected byte[] call() {
+                return service.loadArtworkBytes(path);
+            }
+        };
+
+        loadArtworkTask.setOnSucceeded(e -> {
+            artworkLoadsInFlight.remove(path);
+            byte[] bytes = loadArtworkTask.getValue();
+            if (bytes != null && bytes.length > 0) {
+                artworkBytesCache.put(path, bytes);
+                trackTable.refresh();
+            }
+        });
+
+        loadArtworkTask.setOnFailed(e -> artworkLoadsInFlight.remove(path));
+
+        Thread worker = new Thread(loadArtworkTask, "artwork-lazy-loader");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void configureArtworkDragAndDrop(TableView<TrackEntry> table) {
+        table.setOnDragOver(event -> {
+            if (event.getGestureSource() != table && event.getDragboard().hasFiles()) {
+                if (event.getDragboard().getFiles().stream().anyMatch(this::isSupportedImageFile)) {
+                    event.acceptTransferModes(TransferMode.COPY);
+                }
+            }
+            event.consume();
+        });
+
+        table.setOnDragDropped(event -> {
+            Dragboard dragboard = event.getDragboard();
+            boolean success = false;
+            if (dragboard.hasFiles()) {
+                File image = dragboard.getFiles().stream().filter(this::isSupportedImageFile).findFirst().orElse(null);
+                if (image != null) {
+                    ObservableList<TrackEntry> selected = trackTable.getSelectionModel().getSelectedItems();
+                    if (selected != null && !selected.isEmpty()) {
+                        applyArtworkToTracks(new ArrayList<>(selected), image.toPath(), "drag-and-drop");
+                        success = true;
+                    } else {
+                        statusLabel.setText("Select at least one track before dropping artwork.");
+                    }
+                }
+            }
+            event.setDropCompleted(success);
+            event.consume();
+        });
+    }
+
+    private boolean isSupportedImageFile(File file) {
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".gif");
     }
 
     private HBox createStatusBar() {
@@ -343,6 +435,8 @@ public class SingSongArtworkUI extends Application {
         loadTask.setOnSucceeded(e -> {
             List<TrackEntry> tracks = loadTask.getValue();
             allTracksUnfiltered = new ArrayList<>(tracks);
+            artworkBytesCache.clear();
+            artworkLoadsInFlight.clear();
             applyFilterInternal(tracks);
             statusLabel.setText("Loaded " + tracks.size() + " MP3 files from: " + directory);
             updateSelectionStatus();
@@ -402,7 +496,11 @@ public class SingSongArtworkUI extends Application {
         MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
         replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
 
+        MenuItem batchEditItem = new MenuItem("Batch Edit Metadata...");
+        batchEditItem.setOnAction(e -> openBatchEditDialog());
+
         contextMenu.getItems().add(replaceArtworkItem);
+        contextMenu.getItems().add(batchEditItem);
         return contextMenu;
     }
 
@@ -434,28 +532,76 @@ public class SingSongArtworkUI extends Application {
         File imageFile = chooser.showOpenDialog(null);
 
         if (imageFile != null) {
-            // Save the artwork directory for next time
             saveLastArtworkDirectory(imageFile.toPath().getParent());
-
-            int successCount = 0;
-            int failureCount = 0;
-
-            for (TrackEntry track : selectedTracks) {
-                try {
-                    Path mp3Path = currentDirectory.resolve(track.getFilename());
-                    service.addOrReplaceArtwork(mp3Path, imageFile.toPath());
-                    successCount++;
-                } catch (Exception ex) {
-                    failureCount++;
-                }
-            }
-
-            String message = String.format("Artwork updated: %d succeeded, %d failed", successCount, failureCount);
-            statusLabel.setText(message);
-
-            // Reload the tracks to show the updated artwork
-            loadTracks(currentDirectory);
+            applyArtworkToTracks(new ArrayList<>(selectedTracks), imageFile.toPath(), "picker");
         }
+    }
+
+    private void applyArtworkToTracks(List<TrackEntry> selectedTracks, Path imagePath, String source) {
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (TrackEntry track : selectedTracks) {
+            try {
+                Path mp3Path = currentDirectory.resolve(track.getFilename());
+                service.addOrReplaceArtwork(mp3Path, imagePath);
+                successCount++;
+            } catch (Exception ex) {
+                failureCount++;
+            }
+        }
+
+        artworkBytesCache.clear();
+        artworkLoadsInFlight.clear();
+        statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
+        loadTracks(currentDirectory);
+    }
+
+    private void openBatchEditDialog() {
+        ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
+        if (selectedTracks == null || selectedTracks.isEmpty()) {
+            statusLabel.setText("Error: Please select at least one track");
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Batch Edit Metadata");
+        dialog.setHeaderText("Update metadata for " + selectedTracks.size() + " selected tracks");
+
+        TextField titleField = new TextField();
+        titleField.setPromptText("New title (leave blank to keep existing)");
+
+        TextField artistField = new TextField();
+        artistField.setPromptText("New artist (leave blank to keep existing)");
+
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(10));
+        content.getChildren().add(new Label("Title:"));
+        content.getChildren().add(titleField);
+        content.getChildren().add(new Label("Artist:"));
+        content.getChildren().add(artistField);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        if (dialog.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
+            return;
+        }
+
+        String newTitle = titleField.getText();
+        String newArtist = artistField.getText();
+        if ((newTitle == null || newTitle.isBlank()) && (newArtist == null || newArtist.isBlank())) {
+            statusLabel.setText("Batch edit cancelled: no metadata values provided.");
+            return;
+        }
+
+        List<Path> paths = selectedTracks.stream()
+                .map(track -> currentDirectory.resolve(track.getFilename()))
+                .toList();
+        int updated = service.batchEditMetadata(paths, newTitle, newArtist);
+        statusLabel.setText("Batch metadata edit updated " + updated + " tracks.");
+        loadTracks(currentDirectory);
     }
 
     private void saveLastDirectory(Path directory) {
