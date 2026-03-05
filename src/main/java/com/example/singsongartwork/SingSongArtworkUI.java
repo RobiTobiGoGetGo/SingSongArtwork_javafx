@@ -98,9 +98,10 @@ public class SingSongArtworkUI extends Application {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Three-dot menu (⋯) on far right - using horizontal ellipsis for better visual weight
-        MenuButton optionsMenu = new MenuButton("⋯");
-        optionsMenu.setStyle(topIconStyle);
+        // Three-dot menu (⋮) on far right - larger font size to match visual weight of hamburger
+        String optionsIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
+        MenuButton optionsMenu = new MenuButton("⋮");
+        optionsMenu.setStyle(optionsIconStyle);
         optionsMenu.getStyleClass().add("icon-menu-button");
 
         // Directory info as menu label (non-clickable)
