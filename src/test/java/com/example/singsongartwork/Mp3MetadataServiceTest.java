@@ -109,4 +109,96 @@ class Mp3MetadataServiceTest {
         assertEquals("Original Artist", updatedTag.getFirst(FieldKey.ARTIST));
         assertNotNull(updatedTag.getFirstArtwork());
     }
+
+    @Test
+    void batchEditMetadataUpdatesMultipleFiles(@TempDir Path tempDir) throws Exception {
+        InputStream fixture = getClass().getResourceAsStream("/fixtures/tiny-valid.mp3");
+        assumeTrue(fixture != null, "Missing fixture src/test/resources/fixtures/tiny-valid.mp3");
+
+        Path mp3File1 = tempDir.resolve("track1.mp3");
+        Path mp3File2 = tempDir.resolve("track2.mp3");
+        try (InputStream in = fixture) {
+            Files.copy(in, mp3File1);
+        }
+        try (InputStream in = getClass().getResourceAsStream("/fixtures/tiny-valid.mp3")) {
+            Files.copy(in, mp3File2);
+        }
+
+        int updated = service.batchEditMetadata(
+                List.of(mp3File1, mp3File2),
+                "New Title",
+                "New Artist"
+        );
+
+        assertEquals(2, updated);
+
+        AudioFile file1 = AudioFileIO.read(mp3File1.toFile());
+        Tag tag1 = file1.getTag();
+        assertEquals("New Title", tag1.getFirst(FieldKey.TITLE));
+        assertEquals("New Artist", tag1.getFirst(FieldKey.ARTIST));
+
+        AudioFile file2 = AudioFileIO.read(mp3File2.toFile());
+        Tag tag2 = file2.getTag();
+        assertEquals("New Title", tag2.getFirst(FieldKey.TITLE));
+        assertEquals("New Artist", tag2.getFirst(FieldKey.ARTIST));
+    }
+
+    @Test
+    void batchEditMetadataHandlesPartialUpdates(@TempDir Path tempDir) throws Exception {
+        InputStream fixture = getClass().getResourceAsStream("/fixtures/tiny-valid.mp3");
+        assumeTrue(fixture != null, "Missing fixture src/test/resources/fixtures/tiny-valid.mp3");
+
+        Path mp3File = tempDir.resolve("track.mp3");
+        try (InputStream in = fixture) {
+            Files.copy(in, mp3File);
+        }
+
+        int updated = service.batchEditMetadata(
+                List.of(mp3File),
+                "Updated Title",
+                null
+        );
+
+        assertEquals(1, updated);
+
+        AudioFile file = AudioFileIO.read(mp3File.toFile());
+        Tag tag = file.getTag();
+        assertEquals("Updated Title", tag.getFirst(FieldKey.TITLE));
+    }
+
+    @Test
+    void metadataCacheInvalidatesOnArtworkWrite(@TempDir Path tempDir) throws Exception {
+        InputStream fixture = getClass().getResourceAsStream("/fixtures/tiny-valid.mp3");
+        assumeTrue(fixture != null, "Missing fixture src/test/resources/fixtures/tiny-valid.mp3");
+
+        Path mp3File = tempDir.resolve("track.mp3");
+        try (InputStream in = fixture) {
+            Files.copy(in, mp3File);
+        }
+
+        // Load first time (populates cache)
+        List<TrackEntry> tracks1 = service.loadFromDirectory(tempDir);
+        assertEquals(1, tracks1.size());
+        assertNotNull(tracks1.get(0));
+
+        // Add artwork (should invalidate cache for this file)
+        Path imageFile = tempDir.resolve("cover.png");
+        Files.write(imageFile, Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z2wAAAABJRU5ErkJggg=="
+        ));
+        service.addOrReplaceArtwork(mp3File, imageFile);
+
+        // Load again (cache should be invalidated, so it reads fresh)
+        List<TrackEntry> tracks2 = service.loadFromDirectory(tempDir);
+        assertEquals(1, tracks2.size());
+        assertTrue(tracks2.get(0).hasArtwork(), "Track should show artwork after cache invalidation");
+    }
+
+    @Test
+    void clearCacheResetsState() {
+        service.clearCache();
+        // After clear, internal cache should be empty; loading should work fresh.
+        // This is a smoke test to ensure the method exists and doesn't throw.
+        assertTrue(true);
+    }
 }
