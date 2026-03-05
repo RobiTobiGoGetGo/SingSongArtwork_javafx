@@ -86,9 +86,10 @@ public class SingSongArtworkUI extends Application {
         titleLabel.setStyle("-fx-text-fill: #00d9ff; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
 
         // Hamburger menu (☰)
-        String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 24px; -fx-font-weight: bold; -fx-padding: 8px 12px;";
+        String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 24px; -fx-font-weight: bold; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
         MenuButton helpMenu = new MenuButton("☰");
         helpMenu.setStyle(topIconStyle);
+        helpMenu.getStyleClass().add("icon-menu-button");
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
         helpMenu.getItems().add(shortcutsItem);
@@ -100,6 +101,7 @@ public class SingSongArtworkUI extends Application {
         // Three-dot menu (⋮) on far right
         MenuButton optionsMenu = new MenuButton("⋮");
         optionsMenu.setStyle(topIconStyle);
+        optionsMenu.getStyleClass().add("icon-menu-button");
 
         // Directory info as menu label (non-clickable)
         CustomMenuItem dirMenuItem = new CustomMenuItem();

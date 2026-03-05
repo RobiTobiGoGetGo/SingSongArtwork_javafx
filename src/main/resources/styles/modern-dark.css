@@ -48,37 +48,43 @@
     -fx-background-radius: 4px;
 }
 
-.menu-bar .menu .label {
-    -fx-text-fill: #ffffff;
-}
-
-.context-menu {
-    -fx-background-color: #282828;
-    -fx-border-color: #404040;
-    -fx-border-width: 1px;
-    -fx-background-radius: 6px;
-    -fx-border-radius: 6px;
-    -fx-padding: 4px;
-}
-
-.menu-item {
+/* === ICON MENU BUTTONS (☰ and ⋮) === */
+.icon-menu-button {
     -fx-background-color: transparent;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
     -fx-padding: 8px 12px;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
 }
 
-.menu-item:focused,
-.menu-item:hover {
-    -fx-background-color: #333333;
+.icon-menu-button .label {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+
+.icon-menu-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
     -fx-background-radius: 4px;
 }
 
-.menu-item .label {
-    -fx-text-fill: #ffffff;
+.icon-menu-button:showing {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+    -fx-background-radius: 4px;
 }
 
-.separator .line {
-    -fx-border-color: #404040;
-    -fx-border-width: 1px 0 0 0;
+.icon-menu-button .arrow-button {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.icon-menu-button .arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
 }
 
 /* === BUTTONS === */
@@ -402,4 +408,3 @@
 .table-view:focused .table-row-cell:selected {
     -fx-background-color: #00d9ff44;
 }
-
