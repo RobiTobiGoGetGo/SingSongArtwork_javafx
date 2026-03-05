@@ -540,21 +540,29 @@ public class SingSongArtworkUI extends Application {
     private void applyArtworkToTracks(List<TrackEntry> selectedTracks, Path imagePath, String source) {
         int successCount = 0;
         int failureCount = 0;
+        List<Path> modifiedPaths = new ArrayList<>();
 
         for (TrackEntry track : selectedTracks) {
             try {
                 Path mp3Path = currentDirectory.resolve(track.getFilename());
                 service.addOrReplaceArtwork(mp3Path, imagePath);
                 successCount++;
+                modifiedPaths.add(mp3Path);
             } catch (Exception ex) {
                 failureCount++;
             }
         }
 
-        artworkBytesCache.clear();
-        artworkLoadsInFlight.clear();
+        // Only refresh artwork cache for modified files, not entire directory
+        for (Path modifiedPath : modifiedPaths) {
+            artworkBytesCache.remove(modifiedPath);
+            artworkLoadsInFlight.remove(modifiedPath);
+        }
+
         statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
-        loadTracks(currentDirectory);
+
+        // Refresh table to show updated artwork without full reload
+        trackTable.refresh();
     }
 
     private void openBatchEditDialog() {
@@ -601,7 +609,39 @@ public class SingSongArtworkUI extends Application {
                 .toList();
         int updated = service.batchEditMetadata(paths, newTitle, newArtist);
         statusLabel.setText("Batch metadata edit updated " + updated + " tracks.");
-        loadTracks(currentDirectory);
+
+        // Invalidate cache for modified files and refresh them
+        for (Path path : paths) {
+            service.invalidateCache(path);
+        }
+
+        // Reload only the modified tracks by reloading them from disk
+        Task<Void> refreshTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                for (TrackEntry track : selectedTracks) {
+                    Path mp3Path = currentDirectory.resolve(track.getFilename());
+                    TrackEntry reloadedTrack = service.loadSingleTrack(mp3Path);
+                    if (reloadedTrack != null) {
+                        // Update the entry in allTracksUnfiltered
+                        int idx = allTracksUnfiltered.indexOf(track);
+                        if (idx >= 0) {
+                            allTracksUnfiltered.set(idx, reloadedTrack);
+                        }
+                    }
+                }
+                return null;
+            }
+        };
+
+        refreshTask.setOnSucceeded(e -> {
+            applyFilterInternal(allTracksUnfiltered);
+            trackTable.refresh();
+        });
+
+        Thread worker = new Thread(refreshTask, "batch-metadata-refresher");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private void saveLastDirectory(Path directory) {

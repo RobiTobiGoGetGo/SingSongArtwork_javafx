@@ -1,8 +1,0 @@
-PS C:\Users\robch\IdeaProjects\SingSongArtwork> cd C:\Users\robch\IdeaProjects\SingSongArtwork; timeout 5 mvn javafx:run 2>&1 || echo "App timed out (expected)"
-In Zeile:1 Zeichen:79
-+ ... deaProjects\SingSongArtwork; timeout 5 mvn javafx:run 2>&1 || echo "A ...
-+                                                                ~~
-Das Token "||" ist in dieser Version kein gültiges Anweisungstrennzeichen.
-    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
-    + FullyQualifiedErrorId : InvalidEndOfLine
-

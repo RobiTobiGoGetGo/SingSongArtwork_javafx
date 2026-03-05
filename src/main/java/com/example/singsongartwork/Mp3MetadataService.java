@@ -114,6 +114,14 @@ public class Mp3MetadataService {
         metadataCache.clear();
     }
 
+    public TrackEntry loadSingleTrack(Path mp3Path) {
+        return loadTrackSafely(mp3Path);
+    }
+
+    public void invalidateCache(Path mp3Path) {
+        metadataCache.remove(mp3Path);
+    }
+
     void replaceArtworkInTag(Tag tag, Artwork artwork) throws Exception {
         tag.deleteArtworkField();
         tag.setField(artwork);
@@ -149,9 +157,6 @@ public class Mp3MetadataService {
         }
     }
 
-    private void invalidateCache(Path mp3Path) {
-        metadataCache.remove(mp3Path);
-    }
 
     private String sanitizeTagValue(String value) {
         return value == null ? "" : value.trim();
