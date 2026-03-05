@@ -82,8 +82,15 @@ public class SingSongArtworkUI extends Application {
         // Bottom: status
         root.setBottom(createStatusBar());
 
-        Scene scene = new Scene(root, 900, 600);
+        Scene scene = new Scene(root, 1200, 750);
+
+        // Apply modern dark theme CSS
+        String css = getClass().getResource("/styles/modern-dark.css").toExternalForm();
+        scene.getStylesheets().add(css);
+
         primaryStage.setTitle("SingSongArtwork");
+        primaryStage.setMinWidth(900);
+        primaryStage.setMinHeight(600);
         primaryStage.setScene(scene);
         configureKeyboardShortcuts(scene);
 
@@ -153,27 +160,35 @@ public class SingSongArtworkUI extends Application {
     }
 
     private VBox createTopPanel() {
-        VBox vbox = new VBox(10);
-        vbox.setPadding(new Insets(10));
+        VBox vbox = new VBox(12);
+        vbox.setPadding(new Insets(16));
+        vbox.getStyleClass().add("top-panel");
 
         // Directory selection row
-        HBox dirBox = new HBox(10);
+        HBox dirBox = new HBox(12);
+        dirBox.setAlignment(Pos.CENTER_LEFT);
         browseBtn = new Button("Browse Directory");
+        browseBtn.getStyleClass().add("primary");
         dirLabel = new Label("No directory selected");
+        dirLabel.getStyleClass().add("secondary");
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setVisible(false);
         loadingIndicator.setManaged(false);
-        loadingIndicator.setPrefSize(18, 18);
+        loadingIndicator.setPrefSize(24, 24);
         browseBtn.setOnAction(e -> openDirectoryChooser());
         dirBox.getChildren().add(browseBtn);
         dirBox.getChildren().add(dirLabel);
         dirBox.getChildren().add(loadingIndicator);
 
         // Filter row
-        HBox filterBox = new HBox(10);
+        HBox filterBox = new HBox(12);
+        filterBox.setAlignment(Pos.CENTER_LEFT);
+        filterBox.getStyleClass().add("filter-box");
         Label filterLabel = new Label("Filter:");
         filterTextField = new TextField();
-        filterTextField.setPromptText("Enter search terms (space-separated)");
+        filterTextField.setPromptText("Search tracks by filename, title, or artist...");
+        filterTextField.setPrefWidth(400);
+        HBox.setHgrow(filterTextField, Priority.ALWAYS);
         filterTextField.setOnKeyReleased(e -> applyFilter());
         Button clearFilterBtn = new Button("Clear");
         clearFilterBtn.setOnAction(e -> clearFilter());
@@ -317,15 +332,15 @@ public class SingSongArtworkUI extends Application {
                 }
 
                 try {
-                    Image image = new Image(new ByteArrayInputStream(artworkBytes), 32, 32, true, true);
+                    Image image = new Image(new ByteArrayInputStream(artworkBytes), 48, 48, true, true);
                     if (image.isError()) {
                         setText("yes");
                         setGraphic(null);
                         return;
                     }
                     ImageView imageView = new ImageView(image);
-                    imageView.setFitWidth(32);
-                    imageView.setFitHeight(32);
+                    imageView.setFitWidth(48);
+                    imageView.setFitHeight(48);
                     imageView.setPreserveRatio(true);
                     setText("yes");
                     setGraphic(imageView);
@@ -439,7 +454,8 @@ public class SingSongArtworkUI extends Application {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         HBox statusBar = new HBox(10);
-        statusBar.setPadding(new Insets(8, 10, 8, 10));
+        statusBar.getStyleClass().add("status-bar");
+        statusBar.setPadding(new Insets(10, 14, 10, 14));
         statusBar.setAlignment(Pos.CENTER_LEFT);
         statusBar.getChildren().add(statusLabel);
         statusBar.getChildren().add(spacer);
