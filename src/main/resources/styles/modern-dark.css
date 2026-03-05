@@ -49,42 +49,66 @@
 }
 
 /* === ICON MENU BUTTONS (☰ and ⋮) === */
-.icon-menu-button {
-    -fx-background-color: transparent;
-    -fx-text-fill: #ffffff;
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
-    -fx-padding: 8px 12px;
-    -fx-background-radius: 0;
-    -fx-border-width: 0;
-    -fx-border-color: transparent;
+/* Must override default .menu-button styles */
+.menu-button.icon-menu-button {
+    -fx-background-color: transparent !important;
+    -fx-text-fill: #ffffff !important;
+    -fx-font-size: 24px !important;
+    -fx-font-weight: bold !important;
+    -fx-padding: 8px 12px !important;
+    -fx-background-radius: 0 !important;
+    -fx-border-width: 0 !important;
+    -fx-border-color: transparent !important;
+    -fx-border-radius: 0 !important;
     -fx-cursor: hand;
 }
 
-.icon-menu-button .label {
-    -fx-text-fill: #ffffff;
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
+.menu-button.icon-menu-button .label {
+    -fx-text-fill: #ffffff !important;
+    -fx-font-size: 24px !important;
+    -fx-font-weight: bold !important;
 }
 
-.icon-menu-button:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.1);
-    -fx-background-radius: 4px;
+.menu-button.icon-menu-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1) !important;
+    -fx-background-radius: 4px !important;
+    -fx-border-color: transparent !important;
 }
 
-.icon-menu-button:showing {
-    -fx-background-color: rgba(255, 255, 255, 0.15);
-    -fx-background-radius: 4px;
+.menu-button.icon-menu-button:showing,
+.menu-button.icon-menu-button:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.15) !important;
+    -fx-background-radius: 4px !important;
+    -fx-border-color: transparent !important;
 }
 
-.icon-menu-button .arrow-button {
-    -fx-padding: 0;
-    -fx-background-color: transparent;
+/* Completely hide and disable the arrow button */
+.menu-button.icon-menu-button > .arrow-button {
+    -fx-padding: 0 0 0 0 !important;
+    -fx-min-width: 0 !important;
+    -fx-pref-width: 0 !important;
+    -fx-max-width: 0 !important;
+    -fx-min-height: 0 !important;
+    -fx-pref-height: 0 !important;
+    -fx-max-height: 0 !important;
+    -fx-background-color: transparent !important;
+    -fx-background-insets: 0 !important;
+    -fx-background-radius: 0 !important;
+    visibility: hidden;
 }
 
-.icon-menu-button .arrow {
-    -fx-shape: "";
-    -fx-padding: 0;
+.menu-button.icon-menu-button > .arrow-button > .arrow {
+    -fx-shape: "" !important;
+    -fx-scale-shape: false !important;
+    -fx-padding: 0 0 0 0 !important;
+    -fx-min-width: 0 !important;
+    -fx-pref-width: 0 !important;
+    -fx-max-width: 0 !important;
+    -fx-min-height: 0 !important;
+    -fx-pref-height: 0 !important;
+    -fx-max-height: 0 !important;
+    -fx-background-color: transparent !important;
+    visibility: hidden;
 }
 
 /* === BUTTONS === */
