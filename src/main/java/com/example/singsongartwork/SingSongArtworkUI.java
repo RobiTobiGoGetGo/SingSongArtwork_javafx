@@ -3,12 +3,15 @@ package com.example.singsongartwork;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -28,6 +31,7 @@ public class SingSongArtworkUI extends Application {
     private TableView<TrackEntry> trackTable;
     private TextField filterTextField;
     private Label statusLabel;
+    private Label selectionLabel;
     private Label dirLabel;
     private Path currentDirectory;
     private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
@@ -49,8 +53,7 @@ public class SingSongArtworkUI extends Application {
         root.setCenter(trackTable);
 
         // Bottom: status
-        statusLabel = new Label("Ready. Select a directory to begin.");
-        root.setBottom(statusLabel);
+        root.setBottom(createStatusBar());
 
         Scene scene = new Scene(root, 900, 600);
         primaryStage.setTitle("SingSongArtwork");
@@ -82,7 +85,8 @@ public class SingSongArtworkUI extends Application {
         Button browseBtn = new Button("Browse Directory");
         dirLabel = new Label("No directory selected");
         browseBtn.setOnAction(e -> openDirectoryChooser());
-        dirBox.getChildren().addAll(browseBtn, dirLabel);
+        dirBox.getChildren().add(browseBtn);
+        dirBox.getChildren().add(dirLabel);
 
         // Filter row
         HBox filterBox = new HBox(10);
@@ -90,9 +94,14 @@ public class SingSongArtworkUI extends Application {
         filterTextField = new TextField();
         filterTextField.setPromptText("Enter search terms (space-separated)");
         filterTextField.setOnKeyReleased(e -> applyFilter());
-        filterBox.getChildren().addAll(filterLabel, filterTextField);
+        Button clearFilterBtn = new Button("Clear");
+        clearFilterBtn.setOnAction(e -> clearFilter());
+        filterBox.getChildren().add(filterLabel);
+        filterBox.getChildren().add(filterTextField);
+        filterBox.getChildren().add(clearFilterBtn);
 
-        vbox.getChildren().addAll(dirBox, filterBox);
+        vbox.getChildren().add(dirBox);
+        vbox.getChildren().add(filterBox);
         return vbox;
     }
 
@@ -145,9 +154,11 @@ public class SingSongArtworkUI extends Application {
             fileList.setWrapText(true);
             fileList.setPrefRowCount(8);
 
-            content.getChildren().addAll(info, fileList);
+            content.getChildren().add(info);
+            content.getChildren().add(fileList);
             previewDialog.getDialogPane().setContent(content);
-            previewDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
 
             return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
         } catch (Exception ex) {
@@ -161,40 +172,77 @@ public class SingSongArtworkUI extends Application {
 
         // Enable multi-select
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<TrackEntry, String> filenameCol = new TableColumn<>("Filename");
         filenameCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFilename()));
-        filenameCol.setPrefWidth(200);
+        filenameCol.setPrefWidth(260);
+        filenameCol.setSortable(true);
+        filenameCol.setResizable(true);
 
         TableColumn<TrackEntry, String> titleCol = new TableColumn<>("Title");
         titleCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
-        titleCol.setPrefWidth(200);
+        titleCol.setPrefWidth(260);
+        titleCol.setSortable(true);
+        titleCol.setResizable(true);
 
         TableColumn<TrackEntry, String> artistCol = new TableColumn<>("Artist");
         artistCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getArtist()));
-        artistCol.setPrefWidth(200);
+        artistCol.setPrefWidth(240);
+        artistCol.setSortable(true);
+        artistCol.setResizable(true);
 
         TableColumn<TrackEntry, String> artworkCol = new TableColumn<>("Artwork");
         artworkCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().artworkDisplayValue()));
-        artworkCol.setPrefWidth(100);
+        artworkCol.setPrefWidth(120);
+        artworkCol.setSortable(true);
+        artworkCol.setResizable(true);
 
-        table.getColumns().addAll(filenameCol, titleCol, artistCol, artworkCol);
+        table.getColumns().add(filenameCol);
+        table.getColumns().add(titleCol);
+        table.getColumns().add(artistCol);
+        table.getColumns().add(artworkCol);
 
         // Add right-click context menu
         ContextMenu contextMenu = createTableContextMenu();
         table.setContextMenu(contextMenu);
 
+        // Keep bottom status bar in sync with selection/data changes.
+        table.getSelectionModel().getSelectedItems().addListener((ListChangeListener<TrackEntry>) change -> updateSelectionStatus());
+        table.itemsProperty().addListener((obs, oldItems, newItems) -> updateSelectionStatus());
+
         return table;
     }
 
-    private ContextMenu createTableContextMenu() {
-        ContextMenu contextMenu = new ContextMenu();
+    private HBox createStatusBar() {
+        statusLabel = new Label("Ready. Select a directory to begin.");
+        selectionLabel = new Label("Selected: 0 | Visible: 0");
 
-        MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
-        replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        contextMenu.getItems().add(replaceArtworkItem);
-        return contextMenu;
+        HBox statusBar = new HBox(10);
+        statusBar.setPadding(new Insets(8, 10, 8, 10));
+        statusBar.setAlignment(Pos.CENTER_LEFT);
+        statusBar.getChildren().add(statusLabel);
+        statusBar.getChildren().add(spacer);
+        statusBar.getChildren().add(selectionLabel);
+        return statusBar;
+    }
+
+    private void updateSelectionStatus() {
+        if (selectionLabel == null || trackTable == null) {
+            return;
+        }
+        int selected = trackTable.getSelectionModel().getSelectedItems().size();
+        int visible = trackTable.getItems() == null ? 0 : trackTable.getItems().size();
+        int total = allTracksUnfiltered == null ? 0 : allTracksUnfiltered.size();
+        selectionLabel.setText("Selected: " + selected + " | Visible: " + visible + " | Total: " + total);
+    }
+
+    private void clearFilter() {
+        filterTextField.clear();
+        applyFilter();
     }
 
     private void loadTracks(Path directory) {
@@ -203,6 +251,7 @@ public class SingSongArtworkUI extends Application {
             allTracksUnfiltered = new ArrayList<>(tracks);
             applyFilterInternal(tracks);
             statusLabel.setText("Loaded " + tracks.size() + " MP3 files from: " + directory);
+            updateSelectionStatus();
         } catch (Exception ex) {
             statusLabel.setText("Error: " + ex.getMessage());
         }
@@ -220,6 +269,7 @@ public class SingSongArtworkUI extends Application {
 
             trackTable.setItems(FXCollections.observableArrayList(filtered));
             statusLabel.setText("Showing " + filtered.size() + " tracks");
+            updateSelectionStatus();
         } catch (Exception ex) {
             statusLabel.setText("Error: " + ex.getMessage());
         }
@@ -233,9 +283,20 @@ public class SingSongArtworkUI extends Application {
 
             trackTable.setItems(FXCollections.observableArrayList(filtered));
             statusLabel.setText("Showing " + filtered.size() + " tracks");
+            updateSelectionStatus();
         } catch (Exception ex) {
             statusLabel.setText("Error: " + ex.getMessage());
         }
+    }
+
+    private ContextMenu createTableContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
+        replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
+
+        contextMenu.getItems().add(replaceArtworkItem);
+        return contextMenu;
     }
 
     private void replaceArtworkForSelectedTracks() {
@@ -287,7 +348,8 @@ public class SingSongArtworkUI extends Application {
 
             // Reload the tracks to show the updated artwork
             loadTracks(currentDirectory);
-        }    }
+        }
+    }
 
     private void saveLastDirectory(Path directory) {
         try {
