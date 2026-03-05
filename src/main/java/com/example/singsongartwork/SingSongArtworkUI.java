@@ -84,8 +84,7 @@ public class SingSongArtworkUI extends Application {
         });
         dirBox.getChildren().addAll(browseBtn, dirLabel);
 
-        // ...existing code...
-
+        // Filter row
         HBox filterBox = new HBox(10);
         Label filterLabel = new Label("Filter:");
         filterTextField = new TextField();
@@ -93,18 +92,15 @@ public class SingSongArtworkUI extends Application {
         filterTextField.setOnKeyReleased(e -> applyFilter());
         filterBox.getChildren().addAll(filterLabel, filterTextField);
 
-        // Artwork button row
-        HBox artworkBox = new HBox(10);
-        Button replaceArtworkBtn = new Button("Replace Artwork");
-        replaceArtworkBtn.setOnAction(e -> replaceArtworkForSelectedTrack());
-        artworkBox.getChildren().add(replaceArtworkBtn);
-
-        vbox.getChildren().addAll(dirBox, filterBox, artworkBox);
+        vbox.getChildren().addAll(dirBox, filterBox);
         return vbox;
     }
 
     private TableView<TrackEntry> createTrackTable() {
         TableView<TrackEntry> table = new TableView<>();
+
+        // Enable multi-select
+        table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
         TableColumn<TrackEntry, String> filenameCol = new TableColumn<>("Filename");
         filenameCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFilename()));
@@ -123,7 +119,22 @@ public class SingSongArtworkUI extends Application {
         artworkCol.setPrefWidth(100);
 
         table.getColumns().addAll(filenameCol, titleCol, artistCol, artworkCol);
+
+        // Add right-click context menu
+        ContextMenu contextMenu = createTableContextMenu();
+        table.setContextMenu(contextMenu);
+
         return table;
+    }
+
+    private ContextMenu createTableContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
+        replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
+
+        contextMenu.getItems().add(replaceArtworkItem);
+        return contextMenu;
     }
 
     private void loadTracks(Path directory) {
@@ -167,10 +178,10 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
-    private void replaceArtworkForSelectedTrack() {
-        TrackEntry selected = trackTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            statusLabel.setText("Error: Please select a track first");
+    private void replaceArtworkForSelectedTracks() {
+        ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
+        if (selectedTracks == null || selectedTracks.isEmpty()) {
+            statusLabel.setText("Error: Please select at least one track");
             return;
         }
 
@@ -188,15 +199,24 @@ public class SingSongArtworkUI extends Application {
         File imageFile = chooser.showOpenDialog(null);
 
         if (imageFile != null) {
-            try {
-                Path mp3Path = currentDirectory.resolve(selected.getFilename());
-                service.addOrReplaceArtwork(mp3Path, imageFile.toPath());
-                statusLabel.setText("Artwork updated for: " + selected.getFilename());
-                // Reload the tracks to show the updated artwork
-                loadTracks(currentDirectory);
-            } catch (Exception ex) {
-                statusLabel.setText("Error updating artwork: " + ex.getMessage());
+            int successCount = 0;
+            int failureCount = 0;
+
+            for (TrackEntry track : selectedTracks) {
+                try {
+                    Path mp3Path = currentDirectory.resolve(track.getFilename());
+                    service.addOrReplaceArtwork(mp3Path, imageFile.toPath());
+                    successCount++;
+                } catch (Exception ex) {
+                    failureCount++;
+                }
             }
+
+            String message = String.format("Artwork updated: %d succeeded, %d failed", successCount, failureCount);
+            statusLabel.setText(message);
+
+            // Reload the tracks to show the updated artwork
+            loadTracks(currentDirectory);
         }
     }
 
