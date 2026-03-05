@@ -2,13 +2,20 @@ package com.example.singsongartwork;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -17,6 +24,7 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,6 +41,8 @@ public class SingSongArtworkUI extends Application {
     private Label statusLabel;
     private Label selectionLabel;
     private Label dirLabel;
+    private Button browseBtn;
+    private ProgressIndicator loadingIndicator;
     private Path currentDirectory;
     private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
@@ -58,22 +68,21 @@ public class SingSongArtworkUI extends Application {
         Scene scene = new Scene(root, 900, 600);
         primaryStage.setTitle("SingSongArtwork");
         primaryStage.setScene(scene);
+        configureKeyboardShortcuts(scene);
 
         // Initialize dirLabel with the last used directory path (but don't load it)
         initializeLastDirectoryPath();
 
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
-            e.consume(); // Prevent default close behavior
-            System.exit(0); // Force JVM termination
+            e.consume();
+            System.exit(0);
         });
 
         primaryStage.show();
 
         // ALWAYS auto-open directory chooser on startup (user must explicitly choose directory)
-        Platform.runLater(() -> {
-            openDirectoryChooser();
-        });
+        Platform.runLater(this::openDirectoryChooser);
     }
 
     private VBox createTopPanel() {
@@ -82,11 +91,16 @@ public class SingSongArtworkUI extends Application {
 
         // Directory selection row
         HBox dirBox = new HBox(10);
-        Button browseBtn = new Button("Browse Directory");
+        browseBtn = new Button("Browse Directory");
         dirLabel = new Label("No directory selected");
+        loadingIndicator = new ProgressIndicator();
+        loadingIndicator.setVisible(false);
+        loadingIndicator.setManaged(false);
+        loadingIndicator.setPrefSize(18, 18);
         browseBtn.setOnAction(e -> openDirectoryChooser());
         dirBox.getChildren().add(browseBtn);
         dirBox.getChildren().add(dirLabel);
+        dirBox.getChildren().add(loadingIndicator);
 
         // Filter row
         HBox filterBox = new HBox(10);
@@ -103,6 +117,22 @@ public class SingSongArtworkUI extends Application {
         vbox.getChildren().add(dirBox);
         vbox.getChildren().add(filterBox);
         return vbox;
+    }
+
+    private void configureKeyboardShortcuts(Scene scene) {
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN), this::openDirectoryChooser);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN), this::clearFilter);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN), () -> {
+            if (filterTextField != null) {
+                filterTextField.requestFocus();
+                filterTextField.selectAll();
+            }
+        });
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), () -> {
+            if (currentDirectory != null) {
+                loadTracksAsync(currentDirectory);
+            }
+        });
     }
 
     private void openDirectoryChooser() {
@@ -192,9 +222,45 @@ public class SingSongArtworkUI extends Application {
         artistCol.setSortable(true);
         artistCol.setResizable(true);
 
-        TableColumn<TrackEntry, String> artworkCol = new TableColumn<>("Artwork");
-        artworkCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().artworkDisplayValue()));
-        artworkCol.setPrefWidth(120);
+        TableColumn<TrackEntry, TrackEntry> artworkCol = new TableColumn<>("Artwork");
+        artworkCol.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
+        artworkCol.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(TrackEntry item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                if (!item.hasArtwork()) {
+                    setText("no");
+                    setGraphic(null);
+                    return;
+                }
+
+                try {
+                    Image image = new Image(new ByteArrayInputStream(item.getArtwork()), 32, 32, true, true);
+                    if (image.isError()) {
+                        setText("yes");
+                        setGraphic(null);
+                        return;
+                    }
+                    ImageView imageView = new ImageView(image);
+                    imageView.setFitWidth(32);
+                    imageView.setFitHeight(32);
+                    imageView.setPreserveRatio(true);
+                    setText("yes");
+                    setGraphic(imageView);
+                } catch (Exception ex) {
+                    setText("yes");
+                    setGraphic(null);
+                }
+            }
+        });
+        artworkCol.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
+        artworkCol.setPrefWidth(140);
         artworkCol.setSortable(true);
         artworkCol.setResizable(true);
 
@@ -245,16 +311,57 @@ public class SingSongArtworkUI extends Application {
         applyFilter();
     }
 
-    private void loadTracks(Path directory) {
-        try {
-            List<TrackEntry> tracks = service.loadFromDirectory(directory);
+    private void setLoadingState(boolean loading, String message) {
+        if (loadingIndicator != null) {
+            loadingIndicator.setVisible(loading);
+            loadingIndicator.setManaged(loading);
+        }
+        if (browseBtn != null) {
+            browseBtn.setDisable(loading);
+        }
+        if (filterTextField != null) {
+            filterTextField.setDisable(loading);
+        }
+        if (trackTable != null) {
+            trackTable.setDisable(loading);
+        }
+        if (message != null && statusLabel != null) {
+            statusLabel.setText(message);
+        }
+    }
+
+    private void loadTracksAsync(Path directory) {
+        setLoadingState(true, "Loading MP3 files from: " + directory + " ...");
+
+        Task<List<TrackEntry>> loadTask = new Task<>() {
+            @Override
+            protected List<TrackEntry> call() throws Exception {
+                return service.loadFromDirectory(directory);
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            List<TrackEntry> tracks = loadTask.getValue();
             allTracksUnfiltered = new ArrayList<>(tracks);
             applyFilterInternal(tracks);
             statusLabel.setText("Loaded " + tracks.size() + " MP3 files from: " + directory);
             updateSelectionStatus();
-        } catch (Exception ex) {
-            statusLabel.setText("Error: " + ex.getMessage());
-        }
+            setLoadingState(false, null);
+        });
+
+        loadTask.setOnFailed(e -> {
+            Throwable error = loadTask.getException();
+            statusLabel.setText("Error: " + (error == null ? "Unknown error" : error.getMessage()));
+            setLoadingState(false, null);
+        });
+
+        Thread worker = new Thread(loadTask, "mp3-directory-loader");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void loadTracks(Path directory) {
+        loadTracksAsync(directory);
     }
 
     private void applyFilter() {
