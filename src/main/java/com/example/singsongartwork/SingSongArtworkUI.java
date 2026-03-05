@@ -52,6 +52,12 @@ public class SingSongArtworkUI extends Application {
     private ProgressIndicator loadingIndicator;
     private Path currentDirectory;
     private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
+    private TableColumn<TrackEntry, TrackEntry> artworkColumn;
+    private TableColumn<TrackEntry, String> filenameColumn;
+    private TableColumn<TrackEntry, String> titleColumn;
+    private TableColumn<TrackEntry, String> artistColumn;
+    private boolean moreColumnsMode = false; // default: Less mode
+    private boolean adminMode = false; // default: User mode
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
 
     // Phase 3: Artwork cache and in-flight tracking for lazy loading
@@ -75,8 +81,9 @@ public class SingSongArtworkUI extends Application {
         titleLabel.setStyle("-fx-text-fill: #00d9ff; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
 
         // Hamburger menu (☰)
+        String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 24px; -fx-font-weight: bold; -fx-padding: 8px 12px;";
         MenuButton helpMenu = new MenuButton("☰");
-        helpMenu.setStyle("-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 20px; -fx-padding: 8px 12px;");
+        helpMenu.setStyle(topIconStyle);
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
         helpMenu.getItems().add(shortcutsItem);
@@ -87,7 +94,7 @@ public class SingSongArtworkUI extends Application {
 
         // Three-dot menu (⋮) on far right
         MenuButton optionsMenu = new MenuButton("⋮");
-        optionsMenu.setStyle("-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 24px; -fx-padding: 8px 16px;");
+        optionsMenu.setStyle(topIconStyle);
 
         // Directory info as menu label (non-clickable)
         CustomMenuItem dirMenuItem = new CustomMenuItem();
@@ -115,7 +122,59 @@ public class SingSongArtworkUI extends Application {
             }
         });
 
-        optionsMenu.getItems().addAll(dirMenuItem, separator1, browseItem, reloadItem);
+        SeparatorMenuItem separator2 = new SeparatorMenuItem();
+
+        // Column Mode toggle (default: Less)
+        Menu columnModeMenu = new Menu("Column Mode");
+        ToggleGroup columnModeGroup = new ToggleGroup();
+        RadioMenuItem lessColumnsItem = new RadioMenuItem("Less");
+        lessColumnsItem.setToggleGroup(columnModeGroup);
+        lessColumnsItem.setSelected(true);
+        lessColumnsItem.setOnAction(e -> {
+            moreColumnsMode = false;
+            applyColumnMode();
+        });
+        RadioMenuItem moreColumnsItem = new RadioMenuItem("More");
+        moreColumnsItem.setToggleGroup(columnModeGroup);
+        moreColumnsItem.setOnAction(e -> {
+            moreColumnsMode = true;
+            applyColumnMode();
+        });
+        columnModeMenu.getItems().addAll(lessColumnsItem, moreColumnsItem);
+
+        // Role toggle (default: User) - currently no behavioral effect.
+        Menu roleMenu = new Menu("Role");
+        ToggleGroup roleGroup = new ToggleGroup();
+        RadioMenuItem userRoleItem = new RadioMenuItem("User");
+        userRoleItem.setToggleGroup(roleGroup);
+        userRoleItem.setSelected(true);
+        userRoleItem.setOnAction(e -> {
+            adminMode = false;
+            refreshContextMenuForRole();
+            if (statusLabel != null) {
+                statusLabel.setText("Role switched to User mode");
+            }
+        });
+        RadioMenuItem adminRoleItem = new RadioMenuItem("Admin");
+        adminRoleItem.setToggleGroup(roleGroup);
+        adminRoleItem.setOnAction(e -> {
+            adminMode = true;
+            refreshContextMenuForRole();
+            if (statusLabel != null) {
+                statusLabel.setText("Role switched to Admin mode");
+            }
+        });
+        roleMenu.getItems().addAll(userRoleItem, adminRoleItem);
+
+        optionsMenu.getItems().addAll(
+                dirMenuItem,
+                separator1,
+                browseItem,
+                reloadItem,
+                separator2,
+                columnModeMenu,
+                roleMenu
+        );
 
         titleBar.getChildren().addAll(titleLabel, helpMenu, spacer, optionsMenu);
 
@@ -367,27 +426,27 @@ public class SingSongArtworkUI extends Application {
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        TableColumn<TrackEntry, String> filenameCol = new TableColumn<>("Filename");
-        filenameCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFilename()));
-        filenameCol.setPrefWidth(260);
-        filenameCol.setSortable(true);
-        filenameCol.setResizable(true);
+        filenameColumn = new TableColumn<>("Filename");
+        filenameColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFilename()));
+        filenameColumn.setPrefWidth(320);
+        filenameColumn.setSortable(true);
+        filenameColumn.setResizable(true);
 
-        TableColumn<TrackEntry, String> titleCol = new TableColumn<>("Title");
-        titleCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
-        titleCol.setPrefWidth(260);
-        titleCol.setSortable(true);
-        titleCol.setResizable(true);
+        titleColumn = new TableColumn<>("Title");
+        titleColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
+        titleColumn.setPrefWidth(260);
+        titleColumn.setSortable(true);
+        titleColumn.setResizable(true);
 
-        TableColumn<TrackEntry, String> artistCol = new TableColumn<>("Artist");
-        artistCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getArtist()));
-        artistCol.setPrefWidth(240);
-        artistCol.setSortable(true);
-        artistCol.setResizable(true);
+        artistColumn = new TableColumn<>("Artist");
+        artistColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getArtist()));
+        artistColumn.setPrefWidth(240);
+        artistColumn.setSortable(true);
+        artistColumn.setResizable(true);
 
-        TableColumn<TrackEntry, TrackEntry> artworkCol = new TableColumn<>("Artwork");
-        artworkCol.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
-        artworkCol.setCellFactory(col -> new TableCell<>() {
+        artworkColumn = new TableColumn<>("Artwork");
+        artworkColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
+        artworkColumn.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(TrackEntry item, boolean empty) {
                 super.updateItem(item, empty);
@@ -398,14 +457,14 @@ public class SingSongArtworkUI extends Application {
                 }
 
                 if (!item.hasArtwork()) {
-                    setText("no");
+                    setText("-");
                     setGraphic(null);
                     return;
                 }
 
                 byte[] artworkBytes = getArtworkBytesForItem(item);
                 if (artworkBytes.length == 0) {
-                    setText("yes");
+                    setText("-");
                     setGraphic(null);
                     triggerArtworkLazyLoad(item);
                     return;
@@ -414,7 +473,7 @@ public class SingSongArtworkUI extends Application {
                 try {
                     Image image = new Image(new ByteArrayInputStream(artworkBytes), 48, 48, true, true);
                     if (image.isError()) {
-                        setText("yes");
+                        setText("-");
                         setGraphic(null);
                         return;
                     }
@@ -422,23 +481,26 @@ public class SingSongArtworkUI extends Application {
                     imageView.setFitWidth(48);
                     imageView.setFitHeight(48);
                     imageView.setPreserveRatio(true);
-                    setText("yes");
+                    setText(null);
                     setGraphic(imageView);
                 } catch (Exception ex) {
-                    setText("yes");
+                    setText("-");
                     setGraphic(null);
                 }
             }
         });
-        artworkCol.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
-        artworkCol.setPrefWidth(140);
-        artworkCol.setSortable(true);
-        artworkCol.setResizable(true);
+        artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
+        artworkColumn.setPrefWidth(120);
+        artworkColumn.setSortable(true);
+        artworkColumn.setResizable(true);
 
-        table.getColumns().add(filenameCol);
-        table.getColumns().add(titleCol);
-        table.getColumns().add(artistCol);
-        table.getColumns().add(artworkCol);
+        // Required order: Artwork first.
+        table.getColumns().add(artworkColumn);
+        table.getColumns().add(filenameColumn);
+        table.getColumns().add(titleColumn);
+        table.getColumns().add(artistColumn);
+
+        applyColumnMode();
 
         // Add right-click context menu
         ContextMenu contextMenu = createTableContextMenu();
@@ -452,6 +514,15 @@ public class SingSongArtworkUI extends Application {
         configureArtworkDragAndDrop(table);
 
         return table;
+    }
+
+    private void applyColumnMode() {
+        if (filenameColumn == null || titleColumn == null || artistColumn == null || artworkColumn == null) {
+            return;
+        }
+        boolean showMore = moreColumnsMode;
+        titleColumn.setVisible(showMore);
+        artistColumn.setVisible(showMore);
     }
 
     private byte[] getArtworkBytesForItem(TrackEntry item) {
@@ -665,20 +736,29 @@ public class SingSongArtworkUI extends Application {
     private ContextMenu createTableContextMenu() {
         ContextMenu contextMenu = new ContextMenu();
 
-        MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
-        replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
+        if (adminMode) {
+            MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
+            replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
 
-        MenuItem batchEditItem = new MenuItem("Batch Edit Metadata...");
-        batchEditItem.setOnAction(e -> openBatchEditDialog());
+            MenuItem batchEditItem = new MenuItem("Batch Edit Metadata...");
+            batchEditItem.setOnAction(e -> openBatchEditDialog());
+
+            contextMenu.getItems().add(replaceArtworkItem);
+            contextMenu.getItems().add(batchEditItem);
+            contextMenu.getItems().add(new SeparatorMenuItem());
+        }
 
         MenuItem copyFilenameItem = new MenuItem("Copy Filename(s)");
         copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
-
-        contextMenu.getItems().add(replaceArtworkItem);
-        contextMenu.getItems().add(batchEditItem);
-        contextMenu.getItems().add(new SeparatorMenuItem());
         contextMenu.getItems().add(copyFilenameItem);
+
         return contextMenu;
+    }
+
+    private void refreshContextMenuForRole() {
+        if (trackTable != null) {
+            trackTable.setContextMenu(createTableContextMenu());
+        }
     }
 
     private void copyFilenameToClipboard() {
