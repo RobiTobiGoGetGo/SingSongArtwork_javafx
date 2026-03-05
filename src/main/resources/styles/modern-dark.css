@@ -117,6 +117,42 @@
     -fx-background-color: #1aa34a;
 }
 
+/* === MENU BUTTON === */
+.menu-button {
+    -fx-background-color: #282828;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #404040;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 20px;
+    -fx-cursor: hand;
+}
+
+.menu-button:hover {
+    -fx-background-color: #333333;
+    -fx-border-color: #535353;
+}
+
+.menu-button:pressed,
+.menu-button:showing {
+    -fx-background-color: #1a1a1a;
+}
+
+.menu-button .label {
+    -fx-text-fill: #ffffff;
+}
+
+.menu-button .arrow {
+    -fx-background-color: transparent;
+}
+
+.menu-button .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
 /* === TEXT FIELDS === */
 .text-field {
     -fx-background-color: #282828;

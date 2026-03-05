@@ -48,7 +48,6 @@ public class SingSongArtworkUI extends Application {
     private Label statusLabel;
     private Label selectionLabel;
     private Label dirLabel;
-    private Button browseBtn;
     private ProgressIndicator loadingIndicator;
     private Path currentDirectory;
     private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
@@ -164,21 +163,45 @@ public class SingSongArtworkUI extends Application {
         vbox.setPadding(new Insets(16));
         vbox.getStyleClass().add("top-panel");
 
-        // Directory selection row
-        HBox dirBox = new HBox(12);
-        dirBox.setAlignment(Pos.CENTER_LEFT);
-        browseBtn = new Button("Browse Directory");
-        browseBtn.getStyleClass().add("primary");
+        // Toolbar row with menu button and directory display
+        HBox toolBar = new HBox(12);
+        toolBar.setAlignment(Pos.CENTER_LEFT);
+
+        // Three-dot menu button
+        MenuButton menuButton = new MenuButton("⋮");
+        menuButton.getStyleClass().add("menu-button");
+        menuButton.setStyle("-fx-font-size: 20px; -fx-padding: 8px 16px;");
+
+        // Menu items
+        MenuItem browseItem = new MenuItem("Browse Directory...");
+        browseItem.setOnAction(e -> openDirectoryChooser());
+
+        MenuItem reloadItem = new MenuItem("Reload Directory");
+        reloadItem.setOnAction(e -> {
+            if (currentDirectory != null) {
+                loadTracksAsync(currentDirectory);
+            }
+        });
+
+        menuButton.getItems().addAll(browseItem, reloadItem);
+
+        // Directory label (always visible)
+        VBox dirInfo = new VBox(2);
+        Label dirTitleLabel = new Label("Current Directory:");
+        dirTitleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
         dirLabel = new Label("No directory selected");
         dirLabel.getStyleClass().add("secondary");
+        dirLabel.setStyle("-fx-font-size: 13px;");
+        dirInfo.getChildren().addAll(dirTitleLabel, dirLabel);
+        HBox.setHgrow(dirInfo, Priority.ALWAYS);
+
+        // Loading indicator
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setVisible(false);
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
-        browseBtn.setOnAction(e -> openDirectoryChooser());
-        dirBox.getChildren().add(browseBtn);
-        dirBox.getChildren().add(dirLabel);
-        dirBox.getChildren().add(loadingIndicator);
+
+        toolBar.getChildren().addAll(menuButton, dirInfo, loadingIndicator);
 
         // Filter row
         HBox filterBox = new HBox(12);
@@ -196,7 +219,7 @@ public class SingSongArtworkUI extends Application {
         filterBox.getChildren().add(filterTextField);
         filterBox.getChildren().add(clearFilterBtn);
 
-        vbox.getChildren().add(dirBox);
+        vbox.getChildren().add(toolBar);
         vbox.getChildren().add(filterBox);
         return vbox;
     }
@@ -250,6 +273,11 @@ public class SingSongArtworkUI extends Application {
                 alert.setTitle("No MP3 Files Found");
                 alert.setHeaderText("⚠️ No MP3 files in selected directory");
 
+                // Apply dark theme CSS to alert
+                alert.getDialogPane().getStylesheets().add(
+                    getClass().getResource("/styles/modern-dark.css").toExternalForm()
+                );
+
                 VBox alertContent = new VBox(12);
                 alertContent.setPadding(new Insets(10));
                 Label pathLabel = new Label("Directory:");
@@ -268,6 +296,11 @@ public class SingSongArtworkUI extends Application {
             Dialog<ButtonType> previewDialog = new Dialog<>();
             previewDialog.setTitle("Directory Preview");
             previewDialog.setHeaderText("Selected Directory");
+
+            // Apply dark theme CSS to dialog
+            previewDialog.getDialogPane().getStylesheets().add(
+                getClass().getResource("/styles/modern-dark.css").toExternalForm()
+            );
 
             VBox content = new VBox(16);
             content.setPadding(new Insets(20));
@@ -508,9 +541,6 @@ public class SingSongArtworkUI extends Application {
         if (loadingIndicator != null) {
             loadingIndicator.setVisible(loading);
             loadingIndicator.setManaged(loading);
-        }
-        if (browseBtn != null) {
-            browseBtn.setDisable(loading);
         }
         if (filterTextField != null) {
             filterTextField.setDisable(loading);
