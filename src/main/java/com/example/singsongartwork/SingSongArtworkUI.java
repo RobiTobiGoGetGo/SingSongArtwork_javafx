@@ -64,6 +64,13 @@ public class SingSongArtworkUI extends Application {
 
         // Initialize dirLabel with the last used directory path (but don't load it)
         initializeLastDirectoryPath();
+
+        // Auto-open directory chooser on startup
+        primaryStage.setOnShown(e -> {
+            if (currentDirectory == null) {
+                openDirectoryChooser();
+            }
+        });
     }
 
     private VBox createTopPanel() {
@@ -74,20 +81,7 @@ public class SingSongArtworkUI extends Application {
         HBox dirBox = new HBox(10);
         Button browseBtn = new Button("Browse Directory");
         dirLabel = new Label("No directory selected");
-        browseBtn.setOnAction(e -> {
-            DirectoryChooser chooser = new DirectoryChooser();
-            chooser.setTitle("Select MP3 Directory");
-            if (currentDirectory != null) {
-                chooser.setInitialDirectory(currentDirectory.toFile());
-            }
-            File selected = chooser.showDialog(null);
-            if (selected != null) {
-                currentDirectory = selected.toPath();
-                dirLabel.setText(selected.getAbsolutePath());
-                saveLastDirectory(selected.toPath());
-                loadTracks(selected.toPath());
-            }
-        });
+        browseBtn.setOnAction(e -> openDirectoryChooser());
         dirBox.getChildren().addAll(browseBtn, dirLabel);
 
         // Filter row
@@ -100,6 +94,66 @@ public class SingSongArtworkUI extends Application {
 
         vbox.getChildren().addAll(dirBox, filterBox);
         return vbox;
+    }
+
+    private void openDirectoryChooser() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Select MP3 Directory");
+        if (currentDirectory != null) {
+            chooser.setInitialDirectory(currentDirectory.toFile());
+        }
+        File selected = chooser.showDialog(null);
+        if (selected != null) {
+            // Show preview of MP3 files in the directory
+            if (showDirectoryPreview(selected.toPath())) {
+                currentDirectory = selected.toPath();
+                dirLabel.setText(selected.getAbsolutePath());
+                saveLastDirectory(selected.toPath());
+                loadTracks(selected.toPath());
+            }
+        }
+    }
+
+    private boolean showDirectoryPreview(Path directory) {
+        try {
+            List<String> mp3Files = Files.list(directory)
+                    .filter(p -> !Files.isDirectory(p) && p.toString().toLowerCase().endsWith(".mp3"))
+                    .map(p -> p.getFileName().toString())
+                    .sorted()
+                    .limit(10)
+                    .toList();
+
+            if (mp3Files.isEmpty()) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("No MP3 Files Found");
+                alert.setHeaderText("No MP3 files in selected directory");
+                alert.setContentText("The directory:\n" + directory + "\n\ndoes not contain any MP3 files. Continue anyway?");
+                return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+            }
+
+            // Show preview dialog with sample files
+            Dialog<ButtonType> previewDialog = new Dialog<>();
+            previewDialog.setTitle("Directory Preview");
+            previewDialog.setHeaderText("Selected Directory: " + directory);
+
+            VBox content = new VBox(10);
+            content.setPadding(new Insets(10));
+
+            Label info = new Label("MP3 files found (" + mp3Files.size() + " shown):");
+            TextArea fileList = new TextArea(String.join("\n", mp3Files));
+            fileList.setEditable(false);
+            fileList.setWrapText(true);
+            fileList.setPrefRowCount(8);
+
+            content.getChildren().addAll(info, fileList);
+            previewDialog.getDialogPane().setContent(content);
+            previewDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+            return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+        } catch (Exception ex) {
+            statusLabel.setText("Error reading directory: " + ex.getMessage());
+            return false;
+        }
     }
 
     private TableView<TrackEntry> createTrackTable() {
