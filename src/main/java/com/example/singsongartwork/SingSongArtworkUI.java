@@ -13,6 +13,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -63,9 +65,15 @@ public class SingSongArtworkUI extends Application {
         // Main layout
         BorderPane root = new BorderPane();
 
-        // Top: directory selection and controls
+        // Menu bar
+        MenuBar menuBar = createMenuBar();
+
+        // Top: menu bar and directory selection/controls
+        VBox topSection = new VBox();
+        topSection.getChildren().add(menuBar);
         VBox topPanel = createTopPanel();
-        root.setTop(topPanel);
+        topSection.getChildren().add(topPanel);
+        root.setTop(topSection);
 
         // Center: table
         trackTable = createTrackTable();
@@ -92,6 +100,56 @@ public class SingSongArtworkUI extends Application {
 
         // ALWAYS auto-open directory chooser on startup (user must explicitly choose directory)
         Platform.runLater(this::openDirectoryChooser);
+    }
+
+    private MenuBar createMenuBar() {
+        MenuBar menuBar = new MenuBar();
+
+        // Help menu
+        Menu helpMenu = new Menu("Help");
+        MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
+        shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
+        helpMenu.getItems().add(shortcutsItem);
+
+        menuBar.getMenus().add(helpMenu);
+        return menuBar;
+    }
+
+    private void showKeyboardShortcuts() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Keyboard Shortcuts");
+        alert.setHeaderText("SingSongArtwork - Keyboard Shortcuts");
+
+        String shortcuts = """
+                File Operations:
+                  Ctrl+O          Open/Browse Directory
+                  Ctrl+R          Reload Current Directory
+                
+                Filter & Search:
+                  Ctrl+F          Focus Filter Field
+                  Ctrl+L          Clear Filter
+                
+                Selection & Editing:
+                  Ctrl+C          Copy Filename(s) to Clipboard
+                  Right-click     Context Menu (Replace Artwork, Batch Edit, Copy Filename)
+                
+                Table Navigation:
+                  Ctrl+Click      Multi-select tracks
+                  Shift+Click     Select range
+                  Ctrl+A          Select all tracks
+                
+                Drag & Drop:
+                  Drag image onto selected tracks to replace artwork
+                """;
+
+        TextArea textArea = new TextArea(shortcuts);
+        textArea.setEditable(false);
+        textArea.setWrapText(false);
+        textArea.setPrefRowCount(18);
+        textArea.setPrefColumnCount(50);
+
+        alert.getDialogPane().setContent(textArea);
+        alert.showAndWait();
     }
 
     private VBox createTopPanel() {
@@ -142,6 +200,7 @@ public class SingSongArtworkUI extends Application {
                 loadTracksAsync(currentDirectory);
             }
         });
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN), this::copyFilenameToClipboard);
     }
 
     private void openDirectoryChooser() {
@@ -519,9 +578,35 @@ public class SingSongArtworkUI extends Application {
         MenuItem batchEditItem = new MenuItem("Batch Edit Metadata...");
         batchEditItem.setOnAction(e -> openBatchEditDialog());
 
+        MenuItem copyFilenameItem = new MenuItem("Copy Filename(s)");
+        copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
+
         contextMenu.getItems().add(replaceArtworkItem);
         contextMenu.getItems().add(batchEditItem);
+        contextMenu.getItems().add(new SeparatorMenuItem());
+        contextMenu.getItems().add(copyFilenameItem);
         return contextMenu;
+    }
+
+    private void copyFilenameToClipboard() {
+        ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
+        if (selectedTracks == null || selectedTracks.isEmpty()) {
+            statusLabel.setText("No tracks selected to copy");
+            return;
+        }
+
+        // Collect filenames
+        String filenames = selectedTracks.stream()
+                .map(TrackEntry::getFilename)
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse("");
+
+        // Copy to clipboard
+        ClipboardContent content = new ClipboardContent();
+        content.putString(filenames);
+        Clipboard.getSystemClipboard().setContent(content);
+
+        statusLabel.setText("Copied " + selectedTracks.size() + " filename(s) to clipboard");
     }
 
     private void replaceArtworkForSelectedTracks() {
