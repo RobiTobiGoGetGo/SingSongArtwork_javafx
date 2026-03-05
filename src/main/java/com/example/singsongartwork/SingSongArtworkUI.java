@@ -371,6 +371,7 @@ public class SingSongArtworkUI extends Application {
             filterComboBox.setItems(FXCollections.observableArrayList(defaultTerms.stream().sorted().toList()));
         }
 
+        // testing if this lands in changes
         // Get reference to the editor (TextBox inside ComboBox)
         filterTextField = filterComboBox.getEditor();
         filterTextField.setOnKeyReleased(e -> applyFilter());
