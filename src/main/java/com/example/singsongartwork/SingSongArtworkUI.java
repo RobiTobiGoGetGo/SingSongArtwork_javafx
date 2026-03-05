@@ -553,16 +553,42 @@ public class SingSongArtworkUI extends Application {
             }
         }
 
-        // Only refresh artwork cache for modified files, not entire directory
-        for (Path modifiedPath : modifiedPaths) {
-            artworkBytesCache.remove(modifiedPath);
-            artworkLoadsInFlight.remove(modifiedPath);
-        }
-
         statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
 
-        // Refresh table to show updated artwork without full reload
-        trackTable.refresh();
+        // Reload modified tracks from disk to get updated metadata
+        Task<Void> refreshTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                for (Path modifiedPath : modifiedPaths) {
+                    // Invalidate cache and reload
+                    service.invalidateCache(modifiedPath);
+                    artworkBytesCache.remove(modifiedPath);
+                    artworkLoadsInFlight.remove(modifiedPath);
+
+                    // Load fresh track entry from disk
+                    TrackEntry reloadedTrack = service.loadSingleTrack(modifiedPath);
+                    if (reloadedTrack != null) {
+                        // Find and update the entry in allTracksUnfiltered
+                        for (int i = 0; i < allTracksUnfiltered.size(); i++) {
+                            if (allTracksUnfiltered.get(i).getFilePath().equals(modifiedPath)) {
+                                allTracksUnfiltered.set(i, reloadedTrack);
+                                break;
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+        };
+
+        refreshTask.setOnSucceeded(e -> {
+            applyFilterInternal(allTracksUnfiltered);
+            trackTable.refresh();
+        });
+
+        Thread worker = new Thread(refreshTask, "artwork-refresh-loader");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private void openBatchEditDialog() {
