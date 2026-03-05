@@ -1,6 +1,7 @@
 package com.example.singsongartwork;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -58,22 +59,20 @@ public class SingSongArtworkUI extends Application {
         // Initialize dirLabel with the last used directory path (but don't load it)
         initializeLastDirectoryPath();
 
-        // Register window event handlers BEFORE show()
-        // Auto-open directory chooser on startup (only if no directory was loaded from config)
-        primaryStage.setOnShown(e -> {
-            if (currentDirectory == null) {
-                openDirectoryChooser();
-            }
-        });
-
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
             e.consume(); // Prevent default close behavior
             System.exit(0); // Force JVM termination
         });
 
-
         primaryStage.show();
+
+        // Auto-open directory chooser after window is shown (use Platform.runLater to ensure window is ready)
+        Platform.runLater(() -> {
+            if (currentDirectory == null) {
+                openDirectoryChooser();
+            }
+        });
     }
 
     private VBox createTopPanel() {
