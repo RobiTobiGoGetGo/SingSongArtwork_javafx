@@ -248,30 +248,56 @@ public class SingSongArtworkUI extends Application {
             if (mp3Files.isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.WARNING);
                 alert.setTitle("No MP3 Files Found");
-                alert.setHeaderText("No MP3 files in selected directory");
-                alert.setContentText("The directory:\n" + directory + "\n\ndoes not contain any MP3 files. Continue anyway?");
+                alert.setHeaderText("⚠️ No MP3 files in selected directory");
+
+                VBox alertContent = new VBox(12);
+                alertContent.setPadding(new Insets(10));
+                Label pathLabel = new Label("Directory:");
+                pathLabel.setStyle("-fx-font-weight: bold;");
+                Label pathValue = new Label(directory.toString());
+                pathValue.setWrapText(true);
+                pathValue.setStyle("-fx-text-fill: #b3b3b3;");
+                Label question = new Label("\nThis directory does not contain any MP3 files.\nDo you want to continue anyway?");
+                alertContent.getChildren().addAll(pathLabel, pathValue, question);
+
+                alert.getDialogPane().setContent(alertContent);
                 return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
             }
 
             // Show preview dialog with sample files
             Dialog<ButtonType> previewDialog = new Dialog<>();
             previewDialog.setTitle("Directory Preview");
-            previewDialog.setHeaderText("Selected Directory: " + directory);
+            previewDialog.setHeaderText("Selected Directory");
 
-            VBox content = new VBox(10);
-            content.setPadding(new Insets(10));
+            VBox content = new VBox(16);
+            content.setPadding(new Insets(20));
 
-            Label info = new Label("MP3 files found (" + mp3Files.size() + " shown):");
+            // Directory path label
+            Label dirPathLabel = new Label(directory.toString());
+            dirPathLabel.setWrapText(true);
+            dirPathLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #b3b3b3;");
+
+            // Info label with count
+            Label info = new Label("📁 MP3 files found (" + mp3Files.size() + " shown):");
+            info.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+
+            // File list with better styling
             TextArea fileList = new TextArea(String.join("\n", mp3Files));
             fileList.setEditable(false);
-            fileList.setWrapText(true);
-            fileList.setPrefRowCount(8);
+            fileList.setWrapText(false);
+            fileList.setPrefRowCount(10);
+            fileList.setPrefColumnCount(60);
+            fileList.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 13px;");
 
+            content.getChildren().add(dirPathLabel);
             content.getChildren().add(info);
             content.getChildren().add(fileList);
             previewDialog.getDialogPane().setContent(content);
             previewDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
             previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+            // Set preferred size for dialog
+            previewDialog.getDialogPane().setPrefWidth(700);
 
             return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
         } catch (Exception ex) {
