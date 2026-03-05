@@ -55,8 +55,11 @@ public class SingSongArtworkUI extends Application {
         primaryStage.setTitle("SingSongArtwork");
         primaryStage.setScene(scene);
 
+        // Initialize dirLabel with the last used directory path (but don't load it)
+        initializeLastDirectoryPath();
+
         // Register window event handlers BEFORE show()
-        // Auto-open directory chooser on startup
+        // Auto-open directory chooser on startup (only if no directory was loaded from config)
         primaryStage.setOnShown(e -> {
             if (currentDirectory == null) {
                 openDirectoryChooser();
@@ -69,8 +72,6 @@ public class SingSongArtworkUI extends Application {
             System.exit(0); // Force JVM termination
         });
 
-        // Initialize dirLabel with the last used directory path (but don't load it)
-        initializeLastDirectoryPath();
 
         primaryStage.show();
     }
