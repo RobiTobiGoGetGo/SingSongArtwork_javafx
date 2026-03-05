@@ -98,8 +98,8 @@ public class SingSongArtworkUI extends Application {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Three-dot menu (⋮) on far right
-        MenuButton optionsMenu = new MenuButton("⋮");
+        // Three-dot menu (⋯) on far right - using horizontal ellipsis for better visual weight
+        MenuButton optionsMenu = new MenuButton("⋯");
         optionsMenu.setStyle(topIconStyle);
         optionsMenu.getStyleClass().add("icon-menu-button");
 
