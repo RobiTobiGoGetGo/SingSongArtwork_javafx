@@ -55,22 +55,24 @@ public class SingSongArtworkUI extends Application {
         primaryStage.setTitle("SingSongArtwork");
         primaryStage.setScene(scene);
 
-        // Properly terminate the application when the window is closed
-        primaryStage.setOnCloseRequest(e -> {
-            System.exit(0);
-        });
-
-        primaryStage.show();
-
-        // Initialize dirLabel with the last used directory path (but don't load it)
-        initializeLastDirectoryPath();
-
+        // Register window event handlers BEFORE show()
         // Auto-open directory chooser on startup
         primaryStage.setOnShown(e -> {
             if (currentDirectory == null) {
                 openDirectoryChooser();
             }
         });
+
+        // Properly terminate the application when the window is closed
+        primaryStage.setOnCloseRequest(e -> {
+            e.consume(); // Prevent default close behavior
+            System.exit(0); // Force JVM termination
+        });
+
+        // Initialize dirLabel with the last used directory path (but don't load it)
+        initializeLastDirectoryPath();
+
+        primaryStage.show();
     }
 
     private VBox createTopPanel() {
