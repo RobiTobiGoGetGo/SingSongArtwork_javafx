@@ -858,6 +858,30 @@ public class SingSongArtworkUI extends Application {
             }
         });
 
+        // Step 19: Add space key handler to toggle choice checkbox
+        table.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.SPACE) {
+                event.consume();
+                ObservableList<TrackEntry> selectedItems = table.getSelectionModel().getSelectedItems();
+                if (selectedItems != null && !selectedItems.isEmpty()) {
+                    // Toggle choices for all selected rows
+                    for (TrackEntry track : new ArrayList<>(selectedItems)) {
+                        boolean isCurrentlyChosen = choicesTrackPaths.contains(track.getFilePath());
+                        if (isCurrentlyChosen) {
+                            choicesTrackPaths.remove(track.getFilePath());
+                        } else {
+                            choicesTrackPaths.add(track.getFilePath());
+                        }
+                    }
+                    if (showChoicesOnly) {
+                        applyFilter();
+                    }
+                    table.refresh();
+                    updateSelectionStatus();
+                }
+            }
+        });
+
         return table;
     }
 
