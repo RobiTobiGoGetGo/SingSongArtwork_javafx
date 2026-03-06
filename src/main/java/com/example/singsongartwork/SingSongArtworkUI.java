@@ -459,13 +459,19 @@ public class SingSongArtworkUI extends Application {
                 : "-fx-font-size: 16; -fx-padding: 8px 12px; -fx-opacity: 0.6;");
         });
 
+        // Copy choices to destination button with export/send icon
+        Button copyChoicesBtn = new Button("📤");
+        copyChoicesBtn.setStyle("-fx-font-size: 16; -fx-padding: 8px 12px;");
+        copyChoicesBtn.setTooltip(new Tooltip("Copy choices to destination directory"));
+        copyChoicesBtn.setOnAction(e -> copyChoicesTracksToDirectory());
+
         // Loading indicator
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setVisible(false);
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
 
-        filterBox.getChildren().addAll(filterLabel, filterComboBox, clearFilterBtn, showChoicesToggleBtn, loadingIndicator);
+        filterBox.getChildren().addAll(filterLabel, filterComboBox, clearFilterBtn, showChoicesToggleBtn, copyChoicesBtn, loadingIndicator);
 
         vbox.getChildren().add(filterBox);
         return vbox;
