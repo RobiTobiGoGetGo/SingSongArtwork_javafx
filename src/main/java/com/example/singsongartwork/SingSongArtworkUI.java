@@ -241,32 +241,44 @@ public class SingSongArtworkUI extends Application {
         Menu roleMenu = new Menu("Role");
         roleMenu.setStyle(menuItemStyle);
         ToggleGroup roleGroup = new ToggleGroup();
+
+        // Declare both RadioMenuItems first to avoid scope issues
         RadioMenuItem userRoleItem = new RadioMenuItem("User");
+        RadioMenuItem adminRoleItem = new RadioMenuItem("Admin");
+
         userRoleItem.setStyle(menuItemStyle);
         userRoleItem.setToggleGroup(roleGroup);
         userRoleItem.setSelected(!adminMode);
         userRoleItem.setOnAction(e -> {
-            adminMode = false;
-            refreshContextMenuForRole();
-            // Rebuild options menu based on new admin mode
-            rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
-            saveUiPreferences();
-            if (statusLabel != null) {
-                statusLabel.setText("Role switched to User mode");
+            if (adminMode) { // Only update if actually switching from Admin to User
+                adminMode = false;
+                userRoleItem.setSelected(true);
+                adminRoleItem.setSelected(false);
+                refreshContextMenuForRole();
+                // Rebuild options menu based on new admin mode
+                rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
+                saveUiPreferences();
+                if (statusLabel != null) {
+                    statusLabel.setText("Role switched to User mode");
+                }
             }
         });
-        RadioMenuItem adminRoleItem = new RadioMenuItem("Admin");
+
         adminRoleItem.setStyle(menuItemStyle);
         adminRoleItem.setToggleGroup(roleGroup);
         adminRoleItem.setSelected(adminMode);
         adminRoleItem.setOnAction(e -> {
-            adminMode = true;
-            refreshContextMenuForRole();
-            // Rebuild options menu based on new admin mode
-            rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
-            saveUiPreferences();
-            if (statusLabel != null) {
-                statusLabel.setText("Role switched to Admin mode");
+            if (!adminMode) { // Only update if actually switching from User to Admin
+                adminMode = true;
+                adminRoleItem.setSelected(true);
+                userRoleItem.setSelected(false);
+                refreshContextMenuForRole();
+                // Rebuild options menu based on new admin mode
+                rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
+                saveUiPreferences();
+                if (statusLabel != null) {
+                    statusLabel.setText("Role switched to Admin mode");
+                }
             }
         });
         roleMenu.getItems().addAll(userRoleItem, adminRoleItem);
