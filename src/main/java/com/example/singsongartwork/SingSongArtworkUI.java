@@ -198,6 +198,8 @@ public class SingSongArtworkUI extends Application {
                 choicesTrackPaths
         );
         trackTable = tableBuilder.buildTable();
+        // Replace artwork column with UI version that handles caching and lazy-loading
+        replaceArtworkColumn(trackTable);
         tableBuilder.addSelectionListener((ListChangeListener<TrackEntry>) change -> updateSelectionStatus());
         tableBuilder.addItemsListener((obs, oldItems, newItems) -> updateSelectionStatus());
         configureTableRowFactory(trackTable);
@@ -1574,6 +1576,80 @@ public class SingSongArtworkUI extends Application {
         bottom.getChildren().add(createPlaybackBar());
         bottom.getChildren().add(createStatusBar());
         return bottom;
+    }
+
+    private void replaceArtworkColumn(TableView<TrackEntry> table) {
+        // Find and remove the artwork column built by TableBuilder
+        TableColumn<TrackEntry, ?> artworkCol = null;
+        for (TableColumn<TrackEntry, ?> col : table.getColumns()) {
+            if ("Artwork".equals(col.getText())) {
+                artworkCol = col;
+                break;
+            }
+        }
+
+        if (artworkCol != null) {
+            table.getColumns().remove(artworkCol);
+        }
+
+        // Create new artwork column with proper caching and lazy-loading
+        artworkColumn = new TableColumn<>("Artwork");
+        artworkColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
+        artworkColumn.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(TrackEntry item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                // Check if track has artwork (using the hint)
+                if (!item.hasArtwork()) {
+                    setText("-");
+                    setGraphic(null);
+                    return;
+                }
+
+                // Try to get cached artwork first
+                byte[] artworkBytes = artworkBytesCache.getOrDefault(item.getFilePath(), null);
+
+                if (artworkBytes == null || artworkBytes.length == 0) {
+                    // Artwork not in cache yet - display "-" and trigger lazy load
+                    setText("-");
+                    setGraphic(null);
+                    triggerArtworkLazyLoad(item);
+                    return;
+                }
+
+                // Display cached artwork
+                try {
+                    Image image = new Image(new ByteArrayInputStream(artworkBytes), 48, 48, true, true);
+                    if (image.isError()) {
+                        setText("-");
+                        setGraphic(null);
+                        return;
+                    }
+                    ImageView imageView = new ImageView(image);
+                    imageView.setFitWidth(48);
+                    imageView.setFitHeight(48);
+                    imageView.setPreserveRatio(true);
+                    setText(null);
+                    setGraphic(imageView);
+                } catch (Exception ex) {
+                    setText("-");
+                    setGraphic(null);
+                }
+            }
+        });
+        artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
+        artworkColumn.setPrefWidth(120);
+        artworkColumn.setSortable(true);
+        artworkColumn.setResizable(true);
+
+        // Insert artwork column back at position 2 (after choices and transport)
+        table.getColumns().add(2, artworkColumn);
     }
 
     public static void main(String[] args) {
