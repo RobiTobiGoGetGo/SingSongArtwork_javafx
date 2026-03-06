@@ -53,8 +53,8 @@ public class SingSongArtworkUI extends Application {
     private TextField filterTextField;
     private Label statusLabel;
     private Label selectionLabel;
-    private Label dirLabel;
-    private Label destLabel;
+    private Label musicDirectoryLabel;
+    private Label copyDirectoryLabel;
     private ProgressIndicator loadingIndicator;
     private Path currentDirectory;
     private final List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
@@ -74,9 +74,9 @@ public class SingSongArtworkUI extends Application {
     private boolean moreColumnsMode = false; // default: Less mode
     private boolean adminMode = false; // default: User mode
     private static final Path CONFIG_FILE = Paths.get(System.getProperty("user.home"), ".singsongartwork", "config.properties");
-    private static final String KEY_LAST_DIRECTORY = "last.directory";
+    private static final String KEY_LAST_MUSIC_DIRECTORY = "last.music.directory";
     private static final String KEY_LAST_ARTWORK_DIRECTORY = "last.artwork.directory";
-    private static final String KEY_LAST_COPY_DESTINATION = "last.copy.destination";
+    private static final String KEY_LAST_COPY_DIRECTORY = "last.copy.directory";
     private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
     private static final String KEY_UI_ROLE = "ui.role";
 
@@ -138,41 +138,41 @@ public class SingSongArtworkUI extends Application {
         optionsMenu.setStyle(topIconStyle);
         optionsMenu.getStyleClass().add("icon-menu-button");
 
-        // File source directory info as menu label (non-clickable)
-        CustomMenuItem sourceMenuItem = new CustomMenuItem();
-        VBox sourceInfo = new VBox(3);
-        sourceInfo.setPadding(new Insets(6, 12, 6, 12));
-        Label sourceTitleLabel = new Label("File source:");
-        sourceTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-        dirLabel = new Label("No directory selected");
-        dirLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
-        dirLabel.setWrapText(true);
-        dirLabel.setMaxWidth(300);
-        sourceInfo.getChildren().addAll(sourceTitleLabel, dirLabel);
-        sourceMenuItem.setContent(sourceInfo);
-        sourceMenuItem.setHideOnClick(false);
+        // File music directory info as menu label (non-clickable)
+        CustomMenuItem musicDirectoryMenuItem = new CustomMenuItem();
+        VBox musicDirectoryInfo = new VBox(3);
+        musicDirectoryInfo.setPadding(new Insets(6, 12, 6, 12));
+        Label musicDirectoryTitleLabel = new Label("Music directory:");
+        musicDirectoryTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+        musicDirectoryLabel = new Label("No directory selected");
+        musicDirectoryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
+        musicDirectoryLabel.setWrapText(true);
+        musicDirectoryLabel.setMaxWidth(300);
+        musicDirectoryInfo.getChildren().addAll(musicDirectoryTitleLabel, musicDirectoryLabel);
+        musicDirectoryMenuItem.setContent(musicDirectoryInfo);
+        musicDirectoryMenuItem.setHideOnClick(false);
 
-        // File destination directory info as menu label (non-clickable)
-        CustomMenuItem destMenuItem = new CustomMenuItem();
-        VBox destInfo = new VBox(3);
-        destInfo.setPadding(new Insets(6, 12, 6, 12));
-        Label destTitleLabel = new Label("File destination:");
-        destTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-        destLabel = new Label("Not set");
-        destLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
-        destLabel.setWrapText(true);
-        destLabel.setMaxWidth(300);
-        destInfo.getChildren().addAll(destTitleLabel, destLabel);
-        destMenuItem.setContent(destInfo);
-        destMenuItem.setHideOnClick(false);
+        // File copy directory info as menu label (non-clickable)
+        CustomMenuItem copyDirectoryMenuItem = new CustomMenuItem();
+        VBox copyDirectoryInfo = new VBox(3);
+        copyDirectoryInfo.setPadding(new Insets(6, 12, 6, 12));
+        Label copyDirectoryTitleLabel = new Label("File destination:");
+        copyDirectoryTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+        copyDirectoryLabel = new Label("Not set");
+        copyDirectoryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
+        copyDirectoryLabel.setWrapText(true);
+        copyDirectoryLabel.setMaxWidth(300);
+        copyDirectoryInfo.getChildren().addAll(copyDirectoryTitleLabel, copyDirectoryLabel);
+        copyDirectoryMenuItem.setContent(copyDirectoryInfo);
+        copyDirectoryMenuItem.setHideOnClick(false);
 
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
 
-        MenuItem browseItem = new MenuItem("Choose file source...");
-        browseItem.setStyle(menuItemStyle);
-        browseItem.setOnAction(e -> openDirectoryChooser());
+        MenuItem chooseMusicDirectoryItem = new MenuItem("Choose music directory...");
+        chooseMusicDirectoryItem.setStyle(menuItemStyle);
+        chooseMusicDirectoryItem.setOnAction(e -> openDirectoryChooser());
 
-        MenuItem reloadItem = new MenuItem("Reload files");
+        MenuItem reloadItem = new MenuItem("Reload music files");
         reloadItem.setStyle(menuItemStyle);
         reloadItem.setOnAction(e -> {
             if (currentDirectory != null) {
@@ -181,7 +181,7 @@ public class SingSongArtworkUI extends Application {
                     loadTracksAsync(currentDirectory);
                 }
             } else {
-                statusLabel.setText("Error: No file source set. Please choose a file source first.");
+                statusLabel.setText("Error: No music directory set. Please choose a music directory first.");
             }
         });
 
@@ -207,13 +207,11 @@ public class SingSongArtworkUI extends Application {
 
         MenuItem copyChoicesItem = new MenuItem("Copy choices to...");
         copyChoicesItem.setStyle(menuItemStyle);
-        copyChoicesItem.setOnAction(e -> copyChoicesTracksToDirectory());
+        copyChoicesItem.setOnAction(e -> copyChoicesTracksToCopyDirectory());
 
         MenuItem clearChoicesItem = new MenuItem("Clear choices");
         clearChoicesItem.setStyle(menuItemStyle);
         clearChoicesItem.setOnAction(e -> clearChoicesTracks());
-
-        SeparatorMenuItem separator3 = new SeparatorMenuItem();
 
         // Column Mode toggle (default: Less)
         Menu columnModeMenu = new Menu("Column Mode");
@@ -240,9 +238,9 @@ public class SingSongArtworkUI extends Application {
         columnModeMenu.getItems().addAll(lessColumnsItem, moreColumnsItem);
 
         // Admin-only menu item - declare before role menu
-        MenuItem chooseDestinationItem = new MenuItem("Choose file destination...");
-        chooseDestinationItem.setStyle(menuItemStyle);
-        chooseDestinationItem.setOnAction(e -> chooseFileDestination());
+        MenuItem chooseCopyDirectoryItem = new MenuItem("Choose file destination...");
+        chooseCopyDirectoryItem.setStyle(menuItemStyle);
+        chooseCopyDirectoryItem.setOnAction(e -> chooseCopyDirectory());
 
         // Role toggle (default: User) - currently no behavioral effect.
         roleMenu = new Menu("Role");
@@ -264,7 +262,7 @@ public class SingSongArtworkUI extends Application {
                 refreshContextMenuForRole();
                 updateHelpMenuForRole();
                 // Rebuild options menu based on new admin mode
-                rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
+                rebuildOptionsMenu(optionsMenu, musicDirectoryMenuItem, copyDirectoryMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseCopyDirectoryItem, columnModeMenu, roleMenu);
                 saveUiPreferences();
                 if (statusLabel != null) {
                     statusLabel.setText("Role switched to User mode");
@@ -283,7 +281,7 @@ public class SingSongArtworkUI extends Application {
                 refreshContextMenuForRole();
                 updateHelpMenuForRole();
                 // Rebuild options menu based on new admin mode
-                rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
+                rebuildOptionsMenu(optionsMenu, musicDirectoryMenuItem, copyDirectoryMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseCopyDirectoryItem, columnModeMenu, roleMenu);
                 saveUiPreferences();
                 if (statusLabel != null) {
                     statusLabel.setText("Role switched to Admin mode");
@@ -294,7 +292,7 @@ public class SingSongArtworkUI extends Application {
 
 
         // Build initial optionsMenu
-        rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
+        rebuildOptionsMenu(optionsMenu, musicDirectoryMenuItem, copyDirectoryMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseCopyDirectoryItem, columnModeMenu, roleMenu);
 
         titleBar.getChildren().addAll(titleLabel, helpMenu, spacer, optionsMenu);
 
@@ -338,11 +336,11 @@ public class SingSongArtworkUI extends Application {
 
         configureKeyboardShortcuts(scene);
 
-        // Initialize dirLabel with the last used directory path (but don't load it)
-        initializeLastDirectoryPath();
+        // Initialize dirLabel with the last used music directory path (but don't load it)
+        initializeLastMusicDirectory();
 
-        // Initialize destLabel with the last used destination path (but don't load it)
-        initializeLastDestinationPath();
+        // Initialize copyDirectoryLabel with the last used copy directory path (but don't load it)
+        initializeLastCopyDirectory();
 
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
@@ -353,8 +351,8 @@ public class SingSongArtworkUI extends Application {
 
         primaryStage.show();
 
-        // Step 12: If file source is set, automatically show preview and load files
-        // If not set, user must manually choose via "Choose file source" menu
+        // Step 12: If music directory is set, automatically show preview and load files
+        // If not set, user must manually choose via "Choose music directory" menu
         if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
             Platform.runLater(() -> {
                 if (showDirectoryPreview(currentDirectory)) {
@@ -372,8 +370,8 @@ public class SingSongArtworkUI extends Application {
 
         String shortcuts = """
                 File Operations:
-                  Ctrl+O              Open/Browse Directory
-                  Ctrl+R              Reload Current Directory
+                  Ctrl+O              Open Music Directory
+                  Ctrl+R              Reload Current Music Directory
                 
                 Filter & Search:
                   Ctrl+F              Focus Filter Field
@@ -483,11 +481,11 @@ public class SingSongArtworkUI extends Application {
                 : "-fx-font-size: 16; -fx-padding: 8px 12px; -fx-opacity: 0.6;");
         });
 
-        // Copy choices to destination button with export/send icon
+        // Copy choices to copy directory button with export/send icon
         Button copyChoicesBtn = new Button("📤");
         copyChoicesBtn.setStyle("-fx-font-size: 16; -fx-padding: 8px 12px;");
-        copyChoicesBtn.setTooltip(new Tooltip("Copy choices to destination directory"));
-        copyChoicesBtn.setOnAction(e -> copyChoicesTracksToDirectory());
+        copyChoicesBtn.setTooltip(new Tooltip("Copy choices to copy directory"));
+        copyChoicesBtn.setOnAction(e -> copyChoicesTracksToCopyDirectory());
 
         // Loading indicator
         loadingIndicator = new ProgressIndicator();
@@ -551,8 +549,8 @@ public class SingSongArtworkUI extends Application {
             // Show preview of MP3 files in the directory
             if (showDirectoryPreview(selected.toPath())) {
                 currentDirectory = selected.toPath();
-                dirLabel.setText(selected.getAbsolutePath());
-                saveLastDirectory(selected.toPath());
+                musicDirectoryLabel.setText(selected.getAbsolutePath());
+                saveLastMusicDirectory(selected.toPath());
                 loadTracks(selected.toPath());
             }
         }
@@ -570,10 +568,7 @@ public class SingSongArtworkUI extends Application {
                 return false;
             }
 
-            // CRITICAL FIX: Use File.listFiles() instead of Files.list() for UNC paths
             File dirFile = directory.toFile();
-            System.out.println("[DEBUG] showDirectoryPreview - Directory: " + dirFile.getAbsolutePath());
-            System.out.println("[DEBUG] showDirectoryPreview - Exists: " + dirFile.exists() + ", IsDir: " + dirFile.isDirectory());
 
             // Get both MP3 and other files using File API
             final List<String> mp3FilesList = new ArrayList<>();
@@ -581,7 +576,6 @@ public class SingSongArtworkUI extends Application {
 
             File[] files = dirFile.listFiles();
             if (files != null) {
-                System.out.println("[DEBUG] showDirectoryPreview - Found " + files.length + " items");
                 for (File file : files) {
                     if (file.isFile()) {
                         String fileName = file.getName();
@@ -594,13 +588,8 @@ public class SingSongArtworkUI extends Application {
                     }
                 }
             } else {
-                System.out.println("[DEBUG] showDirectoryPreview - listFiles() returned NULL");
-                statusLabel.setText("Error: Cannot list directory");
                 return false;
             }
-
-            // DEBUG: Log the results
-            System.out.println("[DEBUG] showDirectoryPreview - Final: " + mp3FilesList.size() + " MP3, " + otherFilesList.size() + " other");
 
             // Sort and limit
             mp3FilesList.sort(String::compareTo);
@@ -1429,7 +1418,7 @@ public class SingSongArtworkUI extends Application {
 
             MenuItem copyChoicesItem = new MenuItem("Copy choices to...");
             copyChoicesItem.setStyle(contextMenuItemStyle);
-            copyChoicesItem.setOnAction(e -> copyChoicesTracksToDirectory());
+            copyChoicesItem.setOnAction(e -> copyChoicesTracksToCopyDirectory());
 
             MenuItem clearChoicesItem = new MenuItem("Clear all choices");
             clearChoicesItem.setStyle(contextMenuItemStyle);
@@ -1490,28 +1479,28 @@ public class SingSongArtworkUI extends Application {
         statusLabel.setText("Cleared " + count + " choices");
     }
 
-    private void copyChoicesTracksToDirectory() {
+    private void copyChoicesTracksToCopyDirectory() {
         if (choicesTrackPaths.isEmpty()) {
             statusLabel.setText("No choices to copy");
             return;
         }
 
-        // Step 13: Use saved file destination path instead of showing chooser
-        Path destinationDir = getLastCopyDestination();
+        // Step 13: Use saved copy directory path instead of showing chooser
+        Path copyDirectory = getLastCopyDirectory();
 
         // DEBUG: Log the destination being used
-        System.out.println("[DEBUG] copyChoicesTracksToDirectory - destinationDir: " +
-            (destinationDir != null ? destinationDir.toAbsolutePath() : "NULL"));
+        System.out.println("[DEBUG] copyChoicesTracksToCopyDirectory - copyDirectory: " +
+            (copyDirectory != null ? copyDirectory.toAbsolutePath() : "NULL"));
 
-        if (destinationDir == null || !Files.isDirectory(destinationDir)) {
-            statusLabel.setText("Error: No file destination set. Please choose a file destination first.");
+        if (copyDirectory == null || !Files.isDirectory(copyDirectory)) {
+            statusLabel.setText("Error: No copy directory set. Please choose a copy directory first.");
             return;
         }
 
-        String overwriteWarning = buildOverwriteWarning(destinationDir, choicesTrackPaths);
+        String overwriteWarning = buildOverwriteWarning(copyDirectory, choicesTrackPaths);
 
         // Show directory preview for confirmation before copying
-        if (!showDirectoryPreview(destinationDir, overwriteWarning)) {
+        if (!showDirectoryPreview(copyDirectory, overwriteWarning)) {
             statusLabel.setText("Copy operation cancelled");
             return;
         }
@@ -1522,7 +1511,7 @@ public class SingSongArtworkUI extends Application {
 
         for (Path sourcePath : choicesTrackPaths) {
             try {
-                Path targetPath = destinationDir.resolve(sourcePath.getFileName());
+                Path targetPath = copyDirectory.resolve(sourcePath.getFileName());
                 Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
                 successCount++;
             } catch (Exception ex) {
@@ -1532,15 +1521,15 @@ public class SingSongArtworkUI extends Application {
 
         statusLabel.setText("Copied choices: " + successCount + " succeeded, " + failureCount + " failed");
 
-        // Step 18: Open the destination directory in Windows Explorer if copy was successful
+        // Step 18: Open the copy directory in Windows Explorer if copy was successful
         if (successCount > 0) {
-            openDirectoryInExplorer(destinationDir);
+            openDirectoryInExplorer(copyDirectory);
         }
     }
 
-    private String buildOverwriteWarning(Path destinationDir, Set<Path> sourcePaths) {
+    private String buildOverwriteWarning(Path copyDirectory, Set<Path> sourcePaths) {
         try {
-            File[] destinationFiles = destinationDir.toFile().listFiles();
+            File[] destinationFiles = copyDirectory.toFile().listFiles();
             if (destinationFiles == null) {
                 return null;
             }
@@ -1625,23 +1614,23 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void rebuildOptionsMenu(MenuButton optionsMenu,
-                                    CustomMenuItem sourceMenuItem,
-                                    CustomMenuItem destMenuItem,
+                                    CustomMenuItem musicDirectoryMenuItem,
+                                    CustomMenuItem copyDirectoryMenuItem,
                                     SeparatorMenuItem separator1,
                                     MenuItem reloadItem,
                                     SeparatorMenuItem separator2,
                                     CheckMenuItem showChoicesOnlyItem,
                                     MenuItem copyChoicesItem,
                                     MenuItem clearChoicesItem,
-                                    MenuItem chooseDestinationItem,
+                                    MenuItem chooseCopyDirectoryItem,
                                     Menu columnModeMenu,
                                     Menu roleMenu) {
         optionsMenu.getItems().clear();
 
         // Always visible items
         optionsMenu.getItems().addAll(
-                sourceMenuItem,
-                destMenuItem,
+                musicDirectoryMenuItem,
+                copyDirectoryMenuItem,
                 separator1,
                 reloadItem,
                 separator2,
@@ -1653,48 +1642,47 @@ public class SingSongArtworkUI extends Application {
         // Admin-only items
         if (adminMode) {
             optionsMenu.getItems().add(new SeparatorMenuItem());
-            optionsMenu.getItems().add(new MenuItem("Choose file source...") {
+            optionsMenu.getItems().add(new MenuItem("Choose music directory...") {
                 {
                     setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
                     setOnAction(e -> openDirectoryChooser());
                 }
             });
+            optionsMenu.getItems().add(chooseCopyDirectoryItem);
             optionsMenu.getItems().add(new SeparatorMenuItem());
             optionsMenu.getItems().add(showChoicesOnlyItem);
             optionsMenu.getItems().add(copyChoicesItem);
             optionsMenu.getItems().add(clearChoicesItem);
-            optionsMenu.getItems().add(new SeparatorMenuItem());
-            optionsMenu.getItems().add(chooseDestinationItem);
         }
     }
 
-    private void chooseFileDestination() {
+    private void chooseCopyDirectory() {
         DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("Choose File Destination Directory");
+        chooser.setTitle("Choose copy directory");
 
-        // Use last copy destination if available, otherwise fall back to current directory
-        Path lastCopyDest = getLastCopyDestination();
-        if (lastCopyDest != null && Files.isDirectory(lastCopyDest)) {
-            chooser.setInitialDirectory(lastCopyDest.toFile());
+        // Use last copy directory if available, otherwise fall back to current directory
+        Path lastCopyDir = getLastCopyDirectory();
+        if (lastCopyDir != null && Files.isDirectory(lastCopyDir)) {
+            chooser.setInitialDirectory(lastCopyDir.toFile());
         } else if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
             chooser.setInitialDirectory(currentDirectory.toFile());
         }
 
         File selected = chooser.showDialog(null);
         if (selected == null) {
-            statusLabel.setText("Destination selection cancelled");
+            statusLabel.setText("Copy directory selection cancelled");
             return;
         }
 
-        Path destinationDir = selected.toPath();
-        saveLastCopyDestination(destinationDir);
+        Path copyDirectory = selected.toPath();
+        saveLastCopyDirectory(copyDirectory);
 
-        // Update the destination label in the three-dot menu with full path
-        if (destLabel != null) {
-            destLabel.setText(destinationDir.toAbsolutePath().toString());
+        // Update the copy directory label in the three-dot menu with full path
+        if (copyDirectoryLabel != null) {
+            copyDirectoryLabel.setText(copyDirectory.toAbsolutePath().toString());
         }
 
-        statusLabel.setText("File destination set to: " + destinationDir.toAbsolutePath());
+        statusLabel.setText("Copy directory set to: " + copyDirectory.toAbsolutePath());
     }
 
     private void copyFilenameToClipboard() {
@@ -1871,11 +1859,11 @@ public class SingSongArtworkUI extends Application {
         worker.start();
     }
 
-    private void saveLastDirectory(Path directory) {
+    private void saveLastMusicDirectory(Path directory) {
         try {
             ensureConfigDirectory();
             Properties props = loadConfigProperties();
-            props.setProperty(KEY_LAST_DIRECTORY, directory.toString());
+            props.setProperty(KEY_LAST_MUSIC_DIRECTORY, directory.toString());
 
             try (var out = Files.newOutputStream(CONFIG_FILE)) {
                 props.store(out, "SingSongArtwork Configuration");
@@ -1920,13 +1908,13 @@ public class SingSongArtworkUI extends Application {
         return null;
     }
 
-    private void saveLastCopyDestination(Path directory) {
+    private void saveLastCopyDirectory(Path directory) {
         try {
             ensureConfigDirectory();
             Properties props = loadConfigProperties();
 
             if (directory != null) {
-                props.setProperty(KEY_LAST_COPY_DESTINATION, directory.toString());
+                props.setProperty(KEY_LAST_COPY_DIRECTORY, directory.toString());
             }
 
             try (var out = Files.newOutputStream(CONFIG_FILE)) {
@@ -1937,13 +1925,13 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
-    private Path getLastCopyDestination() {
+    private Path getLastCopyDirectory() {
         try {
             if (Files.exists(CONFIG_FILE)) {
                 Properties props = loadConfigProperties();
-                String lastCopyDest = props.getProperty(KEY_LAST_COPY_DESTINATION);
-                if (lastCopyDest != null && !lastCopyDest.isBlank()) {
-                    Path lastPath = Paths.get(lastCopyDest);
+                String lastCopyDir = props.getProperty(KEY_LAST_COPY_DIRECTORY);
+                if (lastCopyDir != null && !lastCopyDir.isBlank()) {
+                    Path lastPath = Paths.get(lastCopyDir);
                     if (Files.isDirectory(lastPath)) {
                         return lastPath;
                     }
@@ -1955,16 +1943,16 @@ public class SingSongArtworkUI extends Application {
         return null;
     }
 
-    private void initializeLastDirectoryPath() {
+    private void initializeLastMusicDirectory() {
         try {
             if (Files.exists(CONFIG_FILE)) {
                 Properties props = loadConfigProperties();
-                String lastDir = props.getProperty(KEY_LAST_DIRECTORY);
+                String lastDir = props.getProperty(KEY_LAST_MUSIC_DIRECTORY);
                 if (lastDir != null && !lastDir.isBlank()) {
                     Path lastPath = Paths.get(lastDir);
                     if (Files.isDirectory(lastPath)) {
                         currentDirectory = lastPath;
-                        dirLabel.setText(lastPath.toString());
+                        musicDirectoryLabel.setText(lastPath.toString());
                     }
                 }
             }
@@ -1973,16 +1961,16 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
-    private void initializeLastDestinationPath() {
+    private void initializeLastCopyDirectory() {
         try {
             if (Files.exists(CONFIG_FILE)) {
                 Properties props = loadConfigProperties();
-                String lastDest = props.getProperty(KEY_LAST_COPY_DESTINATION);
-                if (lastDest != null && !lastDest.isBlank()) {
-                    Path lastPath = Paths.get(lastDest);
+                String lastDir = props.getProperty(KEY_LAST_COPY_DIRECTORY);
+                if (lastDir != null && !lastDir.isBlank()) {
+                    Path lastPath = Paths.get(lastDir);
                     if (Files.isDirectory(lastPath)) {
-                        if (destLabel != null) {
-                            destLabel.setText(lastPath.toAbsolutePath().toString());
+                        if (copyDirectoryLabel != null) {
+                            copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());
                         }
                     }
                 }
