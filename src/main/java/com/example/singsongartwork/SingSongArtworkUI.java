@@ -497,6 +497,9 @@ public class SingSongArtworkUI extends Application {
                 return false;
             }
 
+            // DEBUG: Log the directory being listed
+            System.out.println("[DEBUG] showDirectoryPreview - Listing directory: " + directory.toAbsolutePath());
+
             // Get both MP3 and other files in one pass to avoid multiple stream issues
             final List<String> mp3FilesList = new ArrayList<>();
             final List<String> otherFilesList = new ArrayList<>();
@@ -512,6 +515,12 @@ public class SingSongArtworkUI extends Application {
                               otherFilesList.add(fileName);
                           }
                       });
+            }
+
+            // DEBUG: Log the files found
+            System.out.println("[DEBUG] showDirectoryPreview - Found " + mp3FilesList.size() + " MP3 files, " + otherFilesList.size() + " other files");
+            if (!otherFilesList.isEmpty()) {
+                System.out.println("[DEBUG] showDirectoryPreview - Other files: " + otherFilesList);
             }
 
             // Sort and limit
@@ -1380,6 +1389,11 @@ public class SingSongArtworkUI extends Application {
 
         // Step 13: Use saved file destination path instead of showing chooser
         Path destinationDir = getLastCopyDestination();
+
+        // DEBUG: Log the destination being used
+        System.out.println("[DEBUG] copyChoicesTracksToDirectory - destinationDir: " +
+            (destinationDir != null ? destinationDir.toAbsolutePath() : "NULL"));
+
         if (destinationDir == null || !Files.isDirectory(destinationDir)) {
             statusLabel.setText("Error: No file destination set. Please choose a file destination first.");
             return;
