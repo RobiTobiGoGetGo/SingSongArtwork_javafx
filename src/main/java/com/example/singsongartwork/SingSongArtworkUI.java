@@ -519,10 +519,14 @@ public class SingSongArtworkUI extends Application {
 
             // DEBUG: Log the files found
             System.out.println("[DEBUG] showDirectoryPreview - Found " + mp3FilesList.size() + " MP3 files, " + otherFilesList.size() + " other files");
+            if (!mp3FilesList.isEmpty()) {
+                System.out.println("[DEBUG] showDirectoryPreview - MP3 files: " + mp3FilesList);
+            }
             if (!otherFilesList.isEmpty()) {
                 System.out.println("[DEBUG] showDirectoryPreview - Other files: " + otherFilesList);
-            }
-
+                // List all files in directory with full paths for verification
+                try (var allStream = Files.list(directory)) {
+                    System.out.println("[DEBUG] showDirectoryPreview - ALL files in directory:");
             // Sort and limit
             mp3FilesList.sort(String::compareTo);
             List<String> mp3Files = mp3FilesList.stream().limit(10).toList();
