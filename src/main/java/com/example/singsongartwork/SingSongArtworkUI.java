@@ -34,6 +34,7 @@ import javafx.util.Duration;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.awt.Desktop;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1493,8 +1494,30 @@ public class SingSongArtworkUI extends Application {
             }
         }
 
-
         statusLabel.setText("Copied choices: " + successCount + " succeeded, " + failureCount + " failed");
+
+        // Step 18: Open the destination directory in Windows Explorer if copy was successful
+        if (successCount > 0) {
+            openDirectoryInExplorer(destinationDir);
+        }
+    }
+
+    private void openDirectoryInExplorer(Path directory) {
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                // Use Windows Explorer to open the directory
+                ProcessBuilder pb = new ProcessBuilder("explorer.exe", directory.toAbsolutePath().toString());
+                pb.start();
+                System.out.println("[DEBUG] Opened directory in Windows Explorer: " + directory.toAbsolutePath());
+            } else {
+                // For other operating systems, try to open with default file manager
+                Desktop.getDesktop().open(directory.toFile());
+                System.out.println("[DEBUG] Opened directory in default file manager: " + directory.toAbsolutePath());
+            }
+        } catch (Exception ex) {
+            System.err.println("[ERROR] Failed to open directory: " + ex.getMessage());
+            // Don't show error to user - the copy was already successful
+        }
     }
 
     private void refreshContextMenuForRole() {
