@@ -668,8 +668,9 @@ public class SingSongArtworkUI extends Application {
                 setGraphic(checkBox);
             }
         });
+        markColumn.setComparator((a, b) -> Boolean.compare(b, a)); // Sort marked (true) before unmarked (false)
         markColumn.setPrefWidth(70);
-        markColumn.setSortable(false);
+        markColumn.setSortable(true);
         markColumn.setResizable(false);
 
         // Required order: mark, transport, artwork, filename, then optional metadata columns.
