@@ -499,31 +499,7 @@ public class SingSongArtworkUI extends Application {
                     .limit(10)
                     .toList();
 
-            if (mp3Files.isEmpty()) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("No MP3 Files Found");
-                alert.setHeaderText("⚠️ No MP3 files in selected directory");
-
-                // Apply dark theme CSS to alert
-                alert.getDialogPane().getStylesheets().add(
-                    getClass().getResource("/styles/modern-dark.css").toExternalForm()
-                );
-
-                VBox alertContent = new VBox(12);
-                alertContent.setPadding(new Insets(10));
-                Label pathLabel = new Label("Directory:");
-                pathLabel.setStyle("-fx-font-weight: bold;");
-                Label pathValue = new Label(directory.toString());
-                pathValue.setWrapText(true);
-                pathValue.setStyle("-fx-text-fill: #b3b3b3;");
-                Label question = new Label("\nThis directory does not contain any MP3 files.\nDo you want to continue anyway?");
-                alertContent.getChildren().addAll(pathLabel, pathValue, question);
-
-                alert.getDialogPane().setContent(alertContent);
-                return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
-            }
-
-            // Show preview dialog with sample files
+            // Show preview dialog for both empty and non-empty directories (consistent fail-safe approach)
             Dialog<ButtonType> previewDialog = new Dialog<>();
             previewDialog.setTitle("Directory Preview");
             previewDialog.setHeaderText("Selected Directory");
@@ -541,27 +517,36 @@ public class SingSongArtworkUI extends Application {
             dirPathLabel.setWrapText(true);
             dirPathLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #b3b3b3;");
 
-            // Info label with count
-            Label info = new Label("📁 MP3 files found (" + mp3Files.size() + " shown):");
-            info.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-
-            // File list with better styling
-            TextArea fileList = new TextArea(String.join("\n", mp3Files));
-            fileList.setEditable(false);
-            fileList.setWrapText(false);
-            fileList.setPrefRowCount(10);
-            fileList.setPrefColumnCount(60);
-            fileList.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 13px;");
-
             content.getChildren().add(dirPathLabel);
-            content.getChildren().add(info);
-            content.getChildren().add(fileList);
+
+            if (mp3Files.isEmpty()) {
+                // Step 14: Show directory preview with consistent message for empty directories
+                Label emptyMessage = new Label("There are currently no MP3 files in this directory");
+                emptyMessage.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+                content.getChildren().add(emptyMessage);
+            } else {
+                // Info label with count
+                Label info = new Label("📁 MP3 files found (" + mp3Files.size() + " shown):");
+                info.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+                content.getChildren().add(info);
+
+                // File list with better styling
+                TextArea fileList = new TextArea(String.join("\n", mp3Files));
+                fileList.setEditable(false);
+                fileList.setWrapText(false);
+                fileList.setPrefRowCount(10);
+                fileList.setPrefColumnCount(60);
+                fileList.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 13px;");
+                content.getChildren().add(fileList);
+            }
+
             previewDialog.getDialogPane().setContent(content);
             previewDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
             previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
 
             // Set preferred size for dialog
             previewDialog.getDialogPane().setPrefWidth(700);
+
 
             return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
         } catch (Exception ex) {
