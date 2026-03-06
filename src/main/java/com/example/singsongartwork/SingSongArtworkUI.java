@@ -497,31 +497,37 @@ public class SingSongArtworkUI extends Application {
                 return false;
             }
 
-            // DEBUG: Log the directory being listed
-            System.out.println("[DEBUG] showDirectoryPreview - Listing directory: " + directory.toAbsolutePath());
+            // CRITICAL FIX: Use File.listFiles() instead of Files.list() for UNC paths
+            File dirFile = directory.toFile();
+            System.out.println("[DEBUG] showDirectoryPreview - Directory: " + dirFile.getAbsolutePath());
+            System.out.println("[DEBUG] showDirectoryPreview - Exists: " + dirFile.exists() + ", IsDir: " + dirFile.isDirectory());
 
-            // Get both MP3 and other files in one pass to avoid multiple stream issues
+            // Get both MP3 and other files using File API
             final List<String> mp3FilesList = new ArrayList<>();
             final List<String> otherFilesList = new ArrayList<>();
 
-            try (var stream = Files.list(directory)) {
-                stream.filter(p -> !Files.isDirectory(p))
-                      .forEach(p -> {
-                          String fileName = p.getFileName().toString();
-                          String lowerName = fileName.toLowerCase();
-                          if (lowerName.endsWith(".mp3")) {
-                              mp3FilesList.add(fileName);
-                          } else {
-                              otherFilesList.add(fileName);
-                          }
-                      });
+            File[] files = dirFile.listFiles();
+            if (files != null) {
+                System.out.println("[DEBUG] showDirectoryPreview - Found " + files.length + " items");
+                for (File file : files) {
+                    if (file.isFile()) {
+                        String fileName = file.getName();
+                        String lowerName = fileName.toLowerCase();
+                        if (lowerName.endsWith(".mp3")) {
+                            mp3FilesList.add(fileName);
+                        } else {
+                            otherFilesList.add(fileName);
+                        }
+                    }
+                }
+            } else {
+                System.out.println("[DEBUG] showDirectoryPreview - listFiles() returned NULL");
+                statusLabel.setText("Error: Cannot list directory");
+                return false;
             }
 
-            // DEBUG: Log the files found
-            System.out.println("[DEBUG] showDirectoryPreview - Found " + mp3FilesList.size() + " MP3 files, " + otherFilesList.size() + " other files");
-            if (!otherFilesList.isEmpty()) {
-                System.out.println("[DEBUG] showDirectoryPreview - Other files: " + otherFilesList);
-            }
+            // DEBUG: Log the results
+            System.out.println("[DEBUG] showDirectoryPreview - Final: " + mp3FilesList.size() + " MP3, " + otherFilesList.size() + " other");
 
             // Sort and limit
             mp3FilesList.sort(String::compareTo);
