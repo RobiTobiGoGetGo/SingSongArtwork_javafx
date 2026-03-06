@@ -10,9 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -249,6 +252,67 @@ class SingSongArtworkUITest {
         assertEquals(0, choicesTrackPaths.size(), "Choices must be cleared when loading new directory");
     }
 
+    @Test
+    @DisplayName("Copy choices overwrite warning lists collisions")
+    void testBuildOverwriteWarningListsCollisions() throws Exception {
+        Path destinationDir = Files.createTempDirectory("singsongartwork-dest");
+        Files.createFile(destinationDir.resolve("a.mp3"));
+        Files.createFile(destinationDir.resolve("b.mp3"));
+
+        Set<Path> sourcePaths = new HashSet<>();
+        sourcePaths.add(Path.of("A.MP3")); // case-insensitive collision
+        sourcePaths.add(Path.of("b.mp3")); // exact collision
+        sourcePaths.add(Path.of("c.mp3")); // no collision
+
+        SingSongArtworkUI ui = new SingSongArtworkUI();
+        Method method = SingSongArtworkUI.class.getDeclaredMethod("buildOverwriteWarning", Path.class, Set.class);
+        method.setAccessible(true);
+
+        String warning = (String) method.invoke(ui, destinationDir, sourcePaths);
+
+        assertNotNull(warning, "Warning should be generated when collisions exist");
+        assertTrue(warning.contains("2 file(s) will be overwritten"), "Warning should include collision count");
+        assertTrue(warning.contains("A.MP3"), "Warning should list colliding source filename");
+        assertTrue(warning.contains("b.mp3"), "Warning should list colliding source filename");
+    }
+
+    @Test
+    @DisplayName("Copy choices overwrite warning is null when no collisions")
+    void testBuildOverwriteWarningNoCollisions() throws Exception {
+        Path destinationDir = Files.createTempDirectory("singsongartwork-dest-no-collision");
+        Files.createFile(destinationDir.resolve("x.mp3"));
+
+        Set<Path> sourcePaths = new HashSet<>();
+        sourcePaths.add(Path.of("a.mp3"));
+        sourcePaths.add(Path.of("b.mp3"));
+
+        SingSongArtworkUI ui = new SingSongArtworkUI();
+        Method method = SingSongArtworkUI.class.getDeclaredMethod("buildOverwriteWarning", Path.class, Set.class);
+        method.setAccessible(true);
+
+        String warning = (String) method.invoke(ui, destinationDir, sourcePaths);
+        assertNull(warning, "Warning should be null when there are no overwrite collisions");
+    }
+
+    @Test
+    @DisplayName("Space-toggle behavior flips choices for all selected rows")
+    void testSpaceToggleBehaviorForSelectedRows() {
+        Set<Path> choices = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        TrackEntry t1 = new TrackEntry(Path.of("song1.mp3"), "t1", "a1", new byte[0]);
+        TrackEntry t2 = new TrackEntry(Path.of("song2.mp3"), "t2", "a2", new byte[0]);
+        java.util.List<TrackEntry> selected = java.util.List.of(t1, t2);
+
+        // First toggle: add both
+        toggleChoicesForSelectedRows(choices, selected);
+        assertTrue(choices.contains(t1.getFilePath()));
+        assertTrue(choices.contains(t2.getFilePath()));
+
+        // Second toggle: remove both
+        toggleChoicesForSelectedRows(choices, selected);
+        assertFalse(choices.contains(t1.getFilePath()));
+        assertFalse(choices.contains(t2.getFilePath()));
+    }
+
     // Helper method to simulate filter application
     private java.util.List<TrackEntry> applyActiveFilters(
             java.util.List<TrackEntry> source,
@@ -265,6 +329,17 @@ class SingSongArtworkUITest {
         // Otherwise apply normal filter
         java.util.List<TrackEntry> textFiltered = SearchFilter.filter(source, filterText);
         return textFiltered;
+    }
+
+    private void toggleChoicesForSelectedRows(Set<Path> choicesTrackPaths, java.util.List<TrackEntry> selectedItems) {
+        for (TrackEntry track : new java.util.ArrayList<>(selectedItems)) {
+            boolean isCurrentlyChosen = choicesTrackPaths.contains(track.getFilePath());
+            if (isCurrentlyChosen) {
+                choicesTrackPaths.remove(track.getFilePath());
+            } else {
+                choicesTrackPaths.add(track.getFilePath());
+            }
+        }
     }
 }
 
