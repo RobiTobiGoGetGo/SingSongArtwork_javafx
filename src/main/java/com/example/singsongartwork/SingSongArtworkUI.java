@@ -1350,23 +1350,20 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("Choose Destination Directory for Bulk Copy");
-
-        // Use last copy destination if available, otherwise fall back to current directory
-        Path lastCopyDest = getLastCopyDestination();
-        if (lastCopyDest != null && Files.isDirectory(lastCopyDest)) {
-            chooser.setInitialDirectory(lastCopyDest.toFile());
-        } else if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
-            chooser.setInitialDirectory(currentDirectory.toFile());
-        }
-
-        File selected = chooser.showDialog(null);
-        if (selected == null) {
+        // Step 13: Use saved file destination path instead of showing chooser
+        Path destinationDir = getLastCopyDestination();
+        if (destinationDir == null || !Files.isDirectory(destinationDir)) {
+            statusLabel.setText("Error: No file destination set. Please choose a file destination first.");
             return;
         }
 
-        Path destinationDir = selected.toPath();
+        // Show directory preview for confirmation before copying
+        if (!showDirectoryPreview(destinationDir)) {
+            statusLabel.setText("Copy operation cancelled");
+            return;
+        }
+
+        // Perform the copy operation
         int successCount = 0;
         int failureCount = 0;
 
@@ -1380,8 +1377,6 @@ public class SingSongArtworkUI extends Application {
             }
         }
 
-        // Save the destination directory for next time
-        saveLastCopyDestination(destinationDir);
 
         statusLabel.setText("Copied choices: " + successCount + " succeeded, " + failureCount + " failed");
     }
