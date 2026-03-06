@@ -1700,8 +1700,8 @@ public class SingSongArtworkUI extends Application {
         String columnMode = props.getProperty(KEY_UI_COLUMN_MODE, "less").trim().toLowerCase();
         moreColumnsMode = "more".equals(columnMode);
 
-        String role = props.getProperty(KEY_UI_ROLE, "user").trim().toLowerCase();
-        adminMode = "admin".equals(role);
+        // FAIL-SAFE: Always start in User mode, regardless of saved preference
+        adminMode = false;
     }
 
     private Properties loadConfigProperties() {
