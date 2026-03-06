@@ -51,7 +51,6 @@ import java.time.format.DateTimeFormatter;
 
 public class SingSongArtworkUI extends Application {
     private Mp3MetadataService service;
-    private ConfigurationManager configManager;
     private TableView<TrackEntry> trackTable;
     private TextField filterTextField;
     private Label statusLabel;
@@ -106,7 +105,6 @@ public class SingSongArtworkUI extends Application {
     @Override
     public void start(Stage primaryStage) {
         service = new Mp3MetadataService();
-        configManager = new ConfigurationManager(CONFIG_FILE);
         initializeUiPreferences();
 
         // Main layout
@@ -396,7 +394,50 @@ public class SingSongArtworkUI extends Application {
 
 
     private void showKeyboardShortcuts() {
-        DialogFactory.showKeyboardShortcuts();
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Keyboard Shortcuts");
+        alert.setHeaderText("SingSongArtwork - Keyboard Shortcuts");
+
+        String shortcuts = """
+                File Operations:
+                  Ctrl+O              Open Music Directory
+                  Ctrl+R              Reload Current Music Directory
+                
+                Filter & Search:
+                  Ctrl+F              Focus Filter Field
+                  Ctrl+L              Clear Filter
+                
+                Selection & Marking:
+                  M                   Mark Selected Rows
+                  Ctrl+Shift+M        Toggle Show Marked Only
+                  Ctrl+Shift+U        Unmark All Files
+                
+                Clipboard:
+                  Ctrl+C              Copy Filename(s) to Clipboard
+                
+                Table Navigation:
+                  Ctrl+Click          Multi-select tracks
+                  Shift+Click         Select range
+                  Ctrl+A              Select all tracks
+                
+                Context Menu:
+                  Right-click         View options for selected tracks
+                
+                Admin & User Modes:
+                  Ctrl+Alt+A          Toggle Admin/User Role
+                
+                Drag & Drop:
+                  Drag image onto selected tracks to replace artwork
+                """;
+
+        TextArea textArea = new TextArea(shortcuts);
+        textArea.setEditable(false);
+        textArea.setWrapText(false);
+        textArea.setPrefRowCount(22);
+        textArea.setPrefColumnCount(50);
+
+        alert.getDialogPane().setContent(textArea);
+        alert.showAndWait();
     }
 
     private VBox createTopPanel() {
@@ -589,7 +630,124 @@ public class SingSongArtworkUI extends Application {
     }
 
     private boolean showDirectoryPreview(Path directory, String warningMessage) {
-        return DialogFactory.showDirectoryPreview(directory, warningMessage);
+        try {
+            // Verify directory exists and is accessible
+            if (directory == null || !Files.isDirectory(directory)) {
+                statusLabel.setText("Error: Invalid directory path");
+                return false;
+            }
+
+            File dirFile = directory.toFile();
+
+            // Get both MP3 and other files using File API
+            final List<String> mp3FilesList = new ArrayList<>();
+            final List<String> otherFilesList = new ArrayList<>();
+
+            File[] files = dirFile.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile()) {
+                        String fileName = file.getName();
+                        String lowerName = fileName.toLowerCase();
+                        if (lowerName.endsWith(".mp3")) {
+                            mp3FilesList.add(fileName);
+                        } else {
+                            otherFilesList.add(fileName);
+                        }
+                    }
+                }
+            } else {
+                return false;
+            }
+
+            // Sort and limit
+            mp3FilesList.sort(String::compareTo);
+            List<String> mp3Files = mp3FilesList.stream().limit(10).toList();
+
+            otherFilesList.sort(String::compareTo);
+            List<String> otherFiles = otherFilesList.stream().limit(10).toList();
+
+            // Show preview dialog for both empty and non-empty directories (consistent fail-safe approach)
+            Dialog<ButtonType> previewDialog = new Dialog<>();
+            previewDialog.setTitle("Directory Preview");
+            previewDialog.setHeaderText("Selected Directory");
+
+            // Apply dark theme CSS to dialog
+            previewDialog.getDialogPane().getStylesheets().add(
+                getClass().getResource("/styles/modern-dark.css").toExternalForm()
+            );
+
+            VBox content = new VBox(16);
+            content.setPadding(new Insets(20));
+
+            // Directory path label
+            Label dirPathLabel = new Label(directory.toString());
+            dirPathLabel.setWrapText(true);
+            dirPathLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #b3b3b3;");
+            content.getChildren().add(dirPathLabel);
+
+            if (warningMessage != null && !warningMessage.isBlank()) {
+                Label overwriteWarningLabel = new Label(warningMessage);
+                overwriteWarningLabel.setWrapText(true);
+                overwriteWarningLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #ff6b6b;");
+                content.getChildren().add(overwriteWarningLabel);
+            }
+
+            if (mp3Files.isEmpty()) {
+                // Step 15: Check for other file types when no MP3 files are found
+                String emptyMessageText = "There are currently no MP3 files in this directory";
+                if (!otherFiles.isEmpty()) {
+                    emptyMessageText += ", but there are other types of files there";
+                }
+
+                Label emptyMessage = new Label(emptyMessageText);
+                emptyMessage.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+                emptyMessage.setWrapText(true);
+                content.getChildren().add(emptyMessage);
+
+                // Show other file types if they exist
+                if (!otherFiles.isEmpty()) {
+                    Label otherFilesLabel = new Label("Other files found (" + otherFiles.size() + " shown):");
+                    otherFilesLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+                    content.getChildren().add(otherFilesLabel);
+
+                    TextArea otherFilesArea = new TextArea(String.join("\n", otherFiles));
+                    otherFilesArea.setEditable(false);
+                    otherFilesArea.setWrapText(false);
+                    otherFilesArea.setPrefRowCount(8);
+                    otherFilesArea.setPrefColumnCount(60);
+                    otherFilesArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 12px;");
+                    content.getChildren().add(otherFilesArea);
+                }
+            } else {
+                // Info label with count
+                Label info = new Label("📁 MP3 files found (" + mp3Files.size() + " shown):");
+                info.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+                content.getChildren().add(info);
+
+                // File list with better styling
+                TextArea fileList = new TextArea(String.join("\n", mp3Files));
+                fileList.setEditable(false);
+                fileList.setWrapText(false);
+                fileList.setPrefRowCount(10);
+                fileList.setPrefColumnCount(60);
+                fileList.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 13px;");
+                content.getChildren().add(fileList);
+            }
+
+            previewDialog.getDialogPane().setContent(content);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+            // Set preferred size for dialog
+            previewDialog.getDialogPane().setPrefWidth(700);
+
+            return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+        } catch (Exception ex) {
+            statusLabel.setText("Error reading directory: " + ex.getMessage());
+            System.err.println("Directory preview error: " + ex.getMessage());
+            return false;
+        }
     }
 
     private TableView<TrackEntry> createTrackTable() {
@@ -1789,55 +1947,187 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void saveLastMusicDirectory(Path directory) {
-        configManager.saveLastMusicDirectory(directory);
+        try {
+            ensureConfigDirectory();
+            Properties props = loadConfigProperties();
+            props.setProperty(KEY_LAST_MUSIC_DIRECTORY, directory.toString());
+
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            statusLabel.setText("Warning: Could not save directory preference: " + ex.getMessage());
+        }
     }
 
     private void saveLastArtworkDirectory(Path directory) {
-        configManager.saveLastArtworkDirectory(directory);
+        try {
+            ensureConfigDirectory();
+            Properties props = loadConfigProperties();
+
+            if (directory != null) {
+                props.setProperty(KEY_LAST_ARTWORK_DIRECTORY, directory.toString());
+            }
+
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            statusLabel.setText("Warning: Could not save artwork directory preference: " + ex.getMessage());
+        }
     }
 
     private Path getLastArtworkDirectory() {
-        return configManager.getLastArtworkDirectory();
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = loadConfigProperties();
+                String lastArtworkDir = props.getProperty(KEY_LAST_ARTWORK_DIRECTORY);
+                if (lastArtworkDir != null && !lastArtworkDir.isBlank()) {
+                    Path lastPath = Paths.get(lastArtworkDir);
+                    if (Files.isDirectory(lastPath)) {
+                        return lastPath;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Silently ignore
+        }
+        return null;
     }
 
     private void saveLastCopyDirectory(Path directory) {
-        configManager.saveLastCopyDirectory(directory);
+        try {
+            ensureConfigDirectory();
+            Properties props = loadConfigProperties();
+
+            if (directory != null) {
+                props.setProperty(KEY_LAST_COPY_DIRECTORY, directory.toString());
+            }
+
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            statusLabel.setText("Warning: Could not save copy destination preference: " + ex.getMessage());
+        }
     }
 
     private Path getLastCopyDirectory() {
-        return configManager.getLastCopyDirectory();
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = loadConfigProperties();
+                String lastCopyDir = props.getProperty(KEY_LAST_COPY_DIRECTORY);
+                if (lastCopyDir != null && !lastCopyDir.isBlank()) {
+                    Path lastPath = Paths.get(lastCopyDir);
+                    if (Files.isDirectory(lastPath)) {
+                        return lastPath;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Silently ignore
+        }
+        return null;
     }
 
     private void initializeLastMusicDirectory() {
-        Path lastPath = configManager.getLastMusicDirectory();
-        if (lastPath != null && Files.isDirectory(lastPath)) {
-            currentDirectory = lastPath;
-            musicDirectoryLabel.setText(lastPath.toString());
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = loadConfigProperties();
+                String lastDir = props.getProperty(KEY_LAST_MUSIC_DIRECTORY);
+                if (lastDir != null && !lastDir.isBlank()) {
+                    Path lastPath = Paths.get(lastDir);
+                    if (Files.isDirectory(lastPath)) {
+                        currentDirectory = lastPath;
+                        musicDirectoryLabel.setText(lastPath.toString());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Silently ignore
         }
     }
 
     private void initializeLastCopyDirectory() {
-        Path lastPath = configManager.getLastCopyDirectory();
-        if (lastPath != null && Files.isDirectory(lastPath) && copyDirectoryLabel != null) {
-            copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = loadConfigProperties();
+                String lastDir = props.getProperty(KEY_LAST_COPY_DIRECTORY);
+                if (lastDir != null && !lastDir.isBlank()) {
+                    Path lastPath = Paths.get(lastDir);
+                    if (Files.isDirectory(lastPath)) {
+                        if (copyDirectoryLabel != null) {
+                            copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Silently ignore
         }
     }
 
+    private void ensureConfigDirectory() throws IOException {
+        Path configDir = CONFIG_FILE.getParent();
+        if (!Files.exists(configDir)) {
+            Files.createDirectories(configDir);
+        }
+    }
 
     private void saveUiPreferences() {
-        configManager.saveColumnMode(moreColumnsMode);
-        configManager.saveAdminMode(adminMode);
+        try {
+            ensureConfigDirectory();
+            Properties props = loadConfigProperties();
+            props.setProperty(KEY_UI_COLUMN_MODE, moreColumnsMode ? "more" : "less");
+            props.setProperty(KEY_UI_ROLE, adminMode ? "admin" : "user");
+            try (var out = Files.newOutputStream(CONFIG_FILE)) {
+                props.store(out, "SingSongArtwork Configuration");
+            }
+        } catch (IOException ex) {
+            if (statusLabel != null) {
+                statusLabel.setText("Warning: Could not save UI preferences: " + ex.getMessage());
+            }
+        }
     }
 
     private void initializeUiPreferences() {
-        moreColumnsMode = configManager.getColumnMode();
+        Properties props = loadConfigProperties();
+        String columnMode = props.getProperty(KEY_UI_COLUMN_MODE, "less").trim().toLowerCase();
+        moreColumnsMode = "more".equals(columnMode);
+
         // FAIL-SAFE: Always start in User mode, regardless of saved preference
         adminMode = false;
     }
 
+    private Properties loadConfigProperties() {
+        Properties props = new Properties();
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                try (var in = Files.newInputStream(CONFIG_FILE)) {
+                    props.load(in);
+                }
+            }
+        } catch (IOException ex) {
+            // Silently ignore
+        }
+        return props;
+    }
 
     private void showAppLogDialog() {
-        DialogFactory.showAppLog(appLogBuffer.toString());
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Application Log");
+        dialog.setHeaderText("SingSongArtwork - Runtime Log");
+
+        TextArea textArea = new TextArea();
+        textArea.setEditable(false);
+        textArea.setWrapText(false);
+        textArea.setPrefRowCount(24);
+        textArea.setPrefColumnCount(90);
+        textArea.setText(appLogBuffer.length() == 0 ? "No log entries yet." : appLogBuffer.toString());
+
+        dialog.getDialogPane().setContent(textArea);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
     private void appendAppLog(String message) {
@@ -1854,7 +2144,28 @@ public class SingSongArtworkUI extends Application {
 
     private void showMarkdownFile(String filename, String title) {
         try {
-            DialogFactory.showMarkdownFile(filename, title);
+            Path mdPath = Paths.get(filename);
+            if (!Files.exists(mdPath)) {
+                statusLabel.setText("Error: " + filename + " not found");
+                return;
+            }
+
+            String content = Files.readString(mdPath);
+
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle(title);
+            dialog.setHeaderText(filename);
+
+            TextArea textArea = new TextArea(content);
+            textArea.setEditable(false);
+            textArea.setWrapText(true);
+            textArea.setPrefRowCount(30);
+            textArea.setPrefColumnCount(100);
+
+            dialog.getDialogPane().setContent(textArea);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            dialog.getDialogPane().setPrefWidth(900);
+            dialog.showAndWait();
         } catch (IOException ex) {
             statusLabel.setText("Error reading " + filename + ": " + ex.getMessage());
         }
