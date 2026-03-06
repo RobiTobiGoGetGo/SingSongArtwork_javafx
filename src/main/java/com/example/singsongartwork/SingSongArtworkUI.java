@@ -426,6 +426,8 @@ public class SingSongArtworkUI extends Application {
         ComboBox<String> filterComboBox = new ComboBox<>();
         filterComboBox.setEditable(true);
         filterComboBox.setPrefWidth(400);
+        filterComboBox.setPrefHeight(34);
+        filterComboBox.setStyle("-fx-font-size: 13px;");
         HBox.setHgrow(filterComboBox, Priority.ALWAYS);
         filterComboBox.setPromptText("Search tracks or select a default term...");
 
@@ -450,7 +452,10 @@ public class SingSongArtworkUI extends Application {
             }
         });
 
+        String barButtonBaseStyle = "-fx-font-size: 13px; -fx-padding: 6px 10px; -fx-min-height: 34px; -fx-pref-height: 34px;";
+
         Button clearFilterBtn = new Button("Clear");
+        clearFilterBtn.setStyle(barButtonBaseStyle);
         clearFilterBtn.setOnAction(e -> {
             filterComboBox.setValue(null);
             filterTextField.clear();
@@ -459,7 +464,7 @@ public class SingSongArtworkUI extends Application {
 
         // Toggle for "Show choices" mode with Check icon
         Button showChoicesToggleBtn = new Button("☑");
-        showChoicesToggleBtn.setStyle("-fx-font-size: 16; -fx-padding: 8px 12px;");
+        showChoicesToggleBtn.setStyle(barButtonBaseStyle + " -fx-opacity: 0.6;");
         showChoicesToggleBtn.setTooltip(new Tooltip("Toggle show choices only"));
         showChoicesToggleBtn.setOnAction(e -> {
             showChoicesOnly = !showChoicesOnly;
@@ -475,15 +480,15 @@ public class SingSongArtworkUI extends Application {
             }
             applyFilter();
             statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
-            // Update button appearance to reflect state
+            // Keep active/inactive feedback while preserving shared button sizing.
             showChoicesToggleBtn.setStyle(showChoicesOnly
-                ? "-fx-font-size: 16; -fx-padding: 8px 12px; -fx-opacity: 1.0;"
-                : "-fx-font-size: 16; -fx-padding: 8px 12px; -fx-opacity: 0.6;");
+                ? barButtonBaseStyle + " -fx-opacity: 1.0;"
+                : barButtonBaseStyle + " -fx-opacity: 0.6;");
         });
 
-        // Copy choices to copy directory button with export/send icon
-        Button copyChoicesBtn = new Button("📤");
-        copyChoicesBtn.setStyle("-fx-font-size: 16; -fx-padding: 8px 12px;");
+        // Copy choices to copy directory button with CD icon
+        Button copyChoicesBtn = new Button("💿");
+        copyChoicesBtn.setStyle(barButtonBaseStyle);
         copyChoicesBtn.setTooltip(new Tooltip("Copy choices to copy directory"));
         copyChoicesBtn.setOnAction(e -> copyChoicesTracksToCopyDirectory());
 
@@ -493,7 +498,18 @@ public class SingSongArtworkUI extends Application {
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
 
-        filterBox.getChildren().addAll(filterLabel, filterComboBox, clearFilterBtn, showChoicesToggleBtn, copyChoicesBtn, loadingIndicator);
+        Region rightSpacer = new Region();
+        HBox.setHgrow(rightSpacer, Priority.ALWAYS);
+
+        filterBox.getChildren().addAll(
+            showChoicesToggleBtn,
+            filterLabel,
+            filterComboBox,
+            clearFilterBtn,
+            loadingIndicator,
+            rightSpacer,
+            copyChoicesBtn
+        );
 
         vbox.getChildren().add(filterBox);
         return vbox;
@@ -697,7 +713,7 @@ public class SingSongArtworkUI extends Application {
         titleColumn = new TableColumn<>("Title");
         titleColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
         titleColumn.setPrefWidth(260);
-        titleColumn.setSortable(true);
+        titleColumn.setSortable(true;
         titleColumn.setResizable(true);
 
         artistColumn = new TableColumn<>("Artist");
