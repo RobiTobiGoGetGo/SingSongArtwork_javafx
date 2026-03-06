@@ -102,14 +102,22 @@ public class TrackTableBuilder {
             @Override
             protected void updateItem(TrackEntry item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null || !item.hasArtwork()) {
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                // Check if track has embedded artwork
+                if (!item.hasArtwork()) {
                     setText("-");
                     setGraphic(null);
                     return;
                 }
 
-                byte[] artworkBytes = artworkLoader.get();
-                if (artworkBytes.length == 0) {
+                // Get artwork bytes directly from the TrackEntry
+                byte[] artworkBytes = item.getArtwork();
+                if (artworkBytes == null || artworkBytes.length == 0) {
                     setText("-");
                     setGraphic(null);
                     return;
