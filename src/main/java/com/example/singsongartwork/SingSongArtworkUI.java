@@ -94,6 +94,7 @@ public class SingSongArtworkUI extends Application {
     private RadioMenuItem adminRoleItem;
     private Menu roleMenu;
     private MenuButton optionsMenu;
+    private MenuButton helpMenu; // Class-level to allow dynamic updates
 
     @Override
     public void start(Stage primaryStage) {
@@ -116,7 +117,7 @@ public class SingSongArtworkUI extends Application {
         String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 12px; -fx-font-weight: normal; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
         String menuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
 
-        MenuButton helpMenu = new MenuButton("☰");
+        helpMenu = new MenuButton("☰");
         helpMenu.setStyle(topIconStyle);
         helpMenu.getStyleClass().add("icon-menu-button");
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
@@ -260,6 +261,7 @@ public class SingSongArtworkUI extends Application {
                 userRoleItem.setSelected(true);
                 adminRoleItem.setSelected(false);
                 refreshContextMenuForRole();
+                updateHelpMenuForRole();
                 // Rebuild options menu based on new admin mode
                 rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
                 saveUiPreferences();
@@ -278,6 +280,7 @@ public class SingSongArtworkUI extends Application {
                 adminRoleItem.setSelected(true);
                 userRoleItem.setSelected(false);
                 refreshContextMenuForRole();
+                updateHelpMenuForRole();
                 // Rebuild options menu based on new admin mode
                 rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
                 saveUiPreferences();
@@ -1497,6 +1500,19 @@ public class SingSongArtworkUI extends Application {
     private void refreshContextMenuForRole() {
         if (trackTable != null) {
             trackTable.setContextMenu(createTableContextMenu());
+        }
+    }
+
+    private void updateHelpMenuForRole() {
+        if (helpMenu != null) {
+            helpMenu.getItems().clear();
+            if (adminMode) {
+                // Add shortcuts item in Admin mode
+                MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
+                shortcutsItem.setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
+                shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
+                helpMenu.getItems().add(shortcutsItem);
+            }
         }
     }
 
