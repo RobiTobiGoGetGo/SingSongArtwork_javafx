@@ -441,6 +441,16 @@ public class SingSongArtworkUI extends Application {
         showChoicesToggleBtn.setTooltip(new Tooltip("Toggle show choices only"));
         showChoicesToggleBtn.setOnAction(e -> {
             showChoicesOnly = !showChoicesOnly;
+            if (showChoicesOnly) {
+                // Save current filter text and disable filter
+                retainedFilterText = filterTextField.getText();
+                filterTextField.setText("");
+                filterTextField.setDisable(true);
+            } else {
+                // Re-enable filter and restore previous filter text
+                filterTextField.setDisable(false);
+                filterTextField.setText(retainedFilterText);
+            }
             applyFilter();
             statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
             // Update button appearance to reflect state
