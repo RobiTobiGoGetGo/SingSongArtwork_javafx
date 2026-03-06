@@ -1,3 +1,0 @@
-PS C:\Users\robch\IdeaProjects\SingSongArtwork> cd C:\Users\robch\IdeaProjects\SingSongArtwork; mvn test -q
-März 06, 2026 1:31:22 PM com.sun.javafx.application.PlatformImpl startup
-WARNUNG: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @23d2a7e8'

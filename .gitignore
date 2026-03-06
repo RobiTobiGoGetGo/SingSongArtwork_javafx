@@ -13,3 +13,5 @@ Thumbs.db
 # Logs
 *.log
 
+# Local scratch/error notes (do not commit)
+src/main/java/com/example/singsongartwork/problems.txt
