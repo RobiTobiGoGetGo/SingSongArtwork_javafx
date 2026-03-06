@@ -228,6 +228,11 @@ public class SingSongArtworkUI extends Application {
         });
         columnModeMenu.getItems().addAll(lessColumnsItem, moreColumnsItem);
 
+        // Admin-only menu item - declare before role menu
+        MenuItem chooseDestinationItem = new MenuItem("Choose file destination...");
+        chooseDestinationItem.setStyle(menuItemStyle);
+        chooseDestinationItem.setOnAction(e -> chooseFileDestination());
+
         // Role toggle (default: User) - currently no behavioral effect.
         Menu roleMenu = new Menu("Role");
         roleMenu.setStyle(menuItemStyle);
@@ -239,6 +244,8 @@ public class SingSongArtworkUI extends Application {
         userRoleItem.setOnAction(e -> {
             adminMode = false;
             refreshContextMenuForRole();
+            // Rebuild options menu based on new admin mode
+            rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
             saveUiPreferences();
             if (statusLabel != null) {
                 statusLabel.setText("Role switched to User mode");
@@ -251,6 +258,8 @@ public class SingSongArtworkUI extends Application {
         adminRoleItem.setOnAction(e -> {
             adminMode = true;
             refreshContextMenuForRole();
+            // Rebuild options menu based on new admin mode
+            rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
             saveUiPreferences();
             if (statusLabel != null) {
                 statusLabel.setText("Role switched to Admin mode");
@@ -258,30 +267,9 @@ public class SingSongArtworkUI extends Application {
         });
         roleMenu.getItems().addAll(userRoleItem, adminRoleItem);
 
-        // Admin-only menu items
-        MenuItem chooseDestinationItem = new MenuItem("Choose file destination...");
-        chooseDestinationItem.setStyle(menuItemStyle);
-        chooseDestinationItem.setOnAction(e -> chooseFileDestination());
 
-        optionsMenu.getItems().addAll(
-                sourceMenuItem,
-                destMenuItem,
-                separator1,
-                browseItem,
-                reloadItem,
-                separator2,
-                showChoicesOnlyItem,
-                columnModeMenu
-        );
-
-        // Add admin-only items
-        optionsMenu.getItems().add(separator3);
-        optionsMenu.getItems().add(copyChoicesItem);
-        optionsMenu.getItems().add(clearChoicesItem);
-        optionsMenu.getItems().add(new SeparatorMenuItem());
-        optionsMenu.getItems().add(chooseDestinationItem);
-        optionsMenu.getItems().add(new SeparatorMenuItem());
-        optionsMenu.getItems().add(roleMenu);
+        // Build initial optionsMenu
+        rebuildOptionsMenu(optionsMenu, sourceMenuItem, destMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseDestinationItem, columnModeMenu, roleMenu);
 
         titleBar.getChildren().addAll(titleLabel, helpMenu, spacer, optionsMenu);
 
@@ -1389,6 +1377,50 @@ public class SingSongArtworkUI extends Application {
     private void refreshContextMenuForRole() {
         if (trackTable != null) {
             trackTable.setContextMenu(createTableContextMenu());
+        }
+    }
+
+    private void rebuildOptionsMenu(MenuButton optionsMenu,
+                                    CustomMenuItem sourceMenuItem,
+                                    CustomMenuItem destMenuItem,
+                                    SeparatorMenuItem separator1,
+                                    MenuItem reloadItem,
+                                    SeparatorMenuItem separator2,
+                                    CheckMenuItem showChoicesOnlyItem,
+                                    MenuItem copyChoicesItem,
+                                    MenuItem clearChoicesItem,
+                                    MenuItem chooseDestinationItem,
+                                    Menu columnModeMenu,
+                                    Menu roleMenu) {
+        optionsMenu.getItems().clear();
+
+        // Always visible items
+        optionsMenu.getItems().addAll(
+                sourceMenuItem,
+                destMenuItem,
+                separator1,
+                reloadItem,
+                separator2,
+                columnModeMenu,
+                new SeparatorMenuItem(),
+                roleMenu
+        );
+
+        // Admin-only items
+        if (adminMode) {
+            optionsMenu.getItems().add(new SeparatorMenuItem());
+            optionsMenu.getItems().add(new MenuItem("Choose file source...") {
+                {
+                    setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
+                    setOnAction(e -> openDirectoryChooser());
+                }
+            });
+            optionsMenu.getItems().add(new SeparatorMenuItem());
+            optionsMenu.getItems().add(showChoicesOnlyItem);
+            optionsMenu.getItems().add(copyChoicesItem);
+            optionsMenu.getItems().add(clearChoicesItem);
+            optionsMenu.getItems().add(new SeparatorMenuItem());
+            optionsMenu.getItems().add(chooseDestinationItem);
         }
     }
 
