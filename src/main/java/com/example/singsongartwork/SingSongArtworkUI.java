@@ -435,13 +435,27 @@ public class SingSongArtworkUI extends Application {
             clearFilter();
         });
 
+        // Toggle for "Show choices" mode with Check icon
+        Button showChoicesToggleBtn = new Button("☑");
+        showChoicesToggleBtn.setStyle("-fx-font-size: 16; -fx-padding: 8px 12px;");
+        showChoicesToggleBtn.setTooltip(new Tooltip("Toggle show choices only"));
+        showChoicesToggleBtn.setOnAction(e -> {
+            showChoicesOnly = !showChoicesOnly;
+            applyFilter();
+            statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
+            // Update button appearance to reflect state
+            showChoicesToggleBtn.setStyle(showChoicesOnly
+                ? "-fx-font-size: 16; -fx-padding: 8px 12px; -fx-opacity: 1.0;"
+                : "-fx-font-size: 16; -fx-padding: 8px 12px; -fx-opacity: 0.6;");
+        });
+
         // Loading indicator
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setVisible(false);
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
 
-        filterBox.getChildren().addAll(filterLabel, filterComboBox, clearFilterBtn, loadingIndicator);
+        filterBox.getChildren().addAll(filterLabel, filterComboBox, clearFilterBtn, showChoicesToggleBtn, loadingIndicator);
 
         vbox.getChildren().add(filterBox);
         return vbox;
