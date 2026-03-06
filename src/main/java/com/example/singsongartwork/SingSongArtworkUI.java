@@ -328,6 +328,9 @@ public class SingSongArtworkUI extends Application {
         // Initialize dirLabel with the last used directory path (but don't load it)
         initializeLastDirectoryPath();
 
+        // Initialize destLabel with the last used destination path (but don't load it)
+        initializeLastDestinationPath();
+
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
@@ -1686,6 +1689,25 @@ public class SingSongArtworkUI extends Application {
                     if (Files.isDirectory(lastPath)) {
                         currentDirectory = lastPath;
                         dirLabel.setText(lastPath.toString());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Silently ignore
+        }
+    }
+
+    private void initializeLastDestinationPath() {
+        try {
+            if (Files.exists(CONFIG_FILE)) {
+                Properties props = loadConfigProperties();
+                String lastDest = props.getProperty(KEY_LAST_COPY_DESTINATION);
+                if (lastDest != null && !lastDest.isBlank()) {
+                    Path lastPath = Paths.get(lastDest);
+                    if (Files.isDirectory(lastPath)) {
+                        if (destLabel != null) {
+                            destLabel.setText(lastPath.toAbsolutePath().toString());
+                        }
                     }
                 }
             }
