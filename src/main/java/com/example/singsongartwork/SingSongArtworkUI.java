@@ -170,7 +170,12 @@ public class SingSongArtworkUI extends Application {
         reloadItem.setStyle(menuItemStyle);
         reloadItem.setOnAction(e -> {
             if (currentDirectory != null) {
-                loadTracksAsync(currentDirectory);
+                // Show directory preview, then load
+                if (showDirectoryPreview(currentDirectory)) {
+                    loadTracksAsync(currentDirectory);
+                }
+            } else {
+                statusLabel.setText("Error: No file source set. Please choose a file source first.");
             }
         });
 
@@ -328,8 +333,15 @@ public class SingSongArtworkUI extends Application {
 
         primaryStage.show();
 
-        // ALWAYS auto-open directory chooser on startup (user must explicitly choose directory)
-        Platform.runLater(this::openDirectoryChooser);
+        // Step 12: If file source is set, automatically show preview and load files
+        // If not set, user must manually choose via "Choose file source" menu
+        if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
+            Platform.runLater(() -> {
+                if (showDirectoryPreview(currentDirectory)) {
+                    loadTracksAsync(currentDirectory);
+                }
+            });
+        }
     }
 
 
