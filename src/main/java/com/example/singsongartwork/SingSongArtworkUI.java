@@ -559,6 +559,10 @@ public class SingSongArtworkUI extends Application {
     }
 
     private boolean showDirectoryPreview(Path directory) {
+        return showDirectoryPreview(directory, null);
+    }
+
+    private boolean showDirectoryPreview(Path directory, String warningMessage) {
         try {
             // Verify directory exists and is accessible
             if (directory == null || !Files.isDirectory(directory)) {
@@ -622,8 +626,14 @@ public class SingSongArtworkUI extends Application {
             Label dirPathLabel = new Label(directory.toString());
             dirPathLabel.setWrapText(true);
             dirPathLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #b3b3b3;");
-
             content.getChildren().add(dirPathLabel);
+
+            if (warningMessage != null && !warningMessage.isBlank()) {
+                Label overwriteWarningLabel = new Label(warningMessage);
+                overwriteWarningLabel.setWrapText(true);
+                overwriteWarningLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #ff6b6b;");
+                content.getChildren().add(overwriteWarningLabel);
+            }
 
             if (mp3Files.isEmpty()) {
                 // Step 15: Check for other file types when no MP3 files are found
@@ -1498,8 +1508,10 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
+        String overwriteWarning = buildOverwriteWarning(destinationDir, choicesTrackPaths);
+
         // Show directory preview for confirmation before copying
-        if (!showDirectoryPreview(destinationDir)) {
+        if (!showDirectoryPreview(destinationDir, overwriteWarning)) {
             statusLabel.setText("Copy operation cancelled");
             return;
         }
@@ -1523,6 +1535,55 @@ public class SingSongArtworkUI extends Application {
         // Step 18: Open the destination directory in Windows Explorer if copy was successful
         if (successCount > 0) {
             openDirectoryInExplorer(destinationDir);
+        }
+    }
+
+    private String buildOverwriteWarning(Path destinationDir, Set<Path> sourcePaths) {
+        try {
+            File[] destinationFiles = destinationDir.toFile().listFiles();
+            if (destinationFiles == null) {
+                return null;
+            }
+
+            Set<String> destinationNamesLower = ConcurrentHashMap.newKeySet();
+            for (File file : destinationFiles) {
+                if (file.isFile()) {
+                    destinationNamesLower.add(file.getName().toLowerCase());
+                }
+            }
+
+            List<String> overwriteNames = new ArrayList<>();
+            for (Path sourcePath : sourcePaths) {
+                String sourceName = sourcePath.getFileName().toString();
+                if (destinationNamesLower.contains(sourceName.toLowerCase())) {
+                    overwriteNames.add(sourceName);
+                }
+            }
+
+            if (overwriteNames.isEmpty()) {
+                return null;
+            }
+
+            overwriteNames.sort(String::compareToIgnoreCase);
+            int shownCount = Math.min(10, overwriteNames.size());
+            List<String> shown = overwriteNames.subList(0, shownCount);
+
+            StringBuilder warning = new StringBuilder();
+            warning.append("Warning: ")
+                   .append(overwriteNames.size())
+                   .append(" file(s) will be overwritten if you continue.\n");
+            for (String name : shown) {
+                warning.append("- ").append(name).append("\n");
+            }
+            if (overwriteNames.size() > shownCount) {
+                warning.append("... and ")
+                       .append(overwriteNames.size() - shownCount)
+                       .append(" more");
+            }
+            return warning.toString().trim();
+        } catch (Exception ex) {
+            System.err.println("[WARN] Could not build overwrite warning: " + ex.getMessage());
+            return null;
         }
     }
 
