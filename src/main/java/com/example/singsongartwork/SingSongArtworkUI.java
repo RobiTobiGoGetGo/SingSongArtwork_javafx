@@ -499,8 +499,8 @@ public class SingSongArtworkUI extends Application {
             }
 
             // Get both MP3 and other files in one pass to avoid multiple stream issues
-            List<String> mp3Files = new ArrayList<>();
-            List<String> otherFiles = new ArrayList<>();
+            final List<String> mp3FilesList = new ArrayList<>();
+            final List<String> otherFilesList = new ArrayList<>();
 
             try (var stream = Files.list(directory)) {
                 stream.filter(p -> !Files.isDirectory(p))
@@ -508,19 +508,19 @@ public class SingSongArtworkUI extends Application {
                           String fileName = p.getFileName().toString();
                           String lowerName = fileName.toLowerCase();
                           if (lowerName.endsWith(".mp3")) {
-                              mp3Files.add(fileName);
+                              mp3FilesList.add(fileName);
                           } else {
-                              otherFiles.add(fileName);
+                              otherFilesList.add(fileName);
                           }
                       });
             }
 
             // Sort and limit
-            mp3Files.sort(String::compareTo);
-            mp3Files = mp3Files.stream().limit(10).toList();
+            mp3FilesList.sort(String::compareTo);
+            List<String> mp3Files = mp3FilesList.stream().limit(10).toList();
 
-            otherFiles.sort(String::compareTo);
-            otherFiles = otherFiles.stream().limit(10).toList();
+            otherFilesList.sort(String::compareTo);
+            List<String> otherFiles = otherFilesList.stream().limit(10).toList();
 
             // Show preview dialog for both empty and non-empty directories (consistent fail-safe approach)
             Dialog<ButtonType> previewDialog = new Dialog<>();
@@ -594,7 +594,7 @@ public class SingSongArtworkUI extends Application {
             return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
         } catch (Exception ex) {
             statusLabel.setText("Error reading directory: " + ex.getMessage());
-            ex.printStackTrace();
+            System.err.println("Directory preview error: " + ex.getMessage());
             return false;
         }
     }
@@ -881,17 +881,17 @@ public class SingSongArtworkUI extends Application {
         } catch (ClassNotFoundException ex) {
             String msg = "JavaFX media module not found. The javafx.media module is not on the module path.";
             System.err.println("[ERROR] " + msg);
-            ex.printStackTrace();
+            System.err.println("Stack trace: " + ex);
             throw new RuntimeException(msg, ex);
         } catch (java.lang.reflect.InvocationTargetException ex) {
             String msg = "JavaFX Media failed to initialize: " + ex.getCause();
             System.err.println("[ERROR] " + msg);
-            ex.getCause().printStackTrace();
+            System.err.println("Cause: " + ex.getCause());
             throw new RuntimeException(msg, ex.getCause());
         } catch (Exception ex) {
             String msg = "JavaFX media module error: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
             System.err.println("[ERROR] " + msg);
-            ex.printStackTrace();
+            System.err.println("Stack trace: " + ex);
             throw new RuntimeException(msg, ex);
         }
     }
@@ -1486,7 +1486,7 @@ public class SingSongArtworkUI extends Application {
             destLabel.setText(destinationDir.toAbsolutePath().toString());
         }
 
-        statusLabel.setText("File destination set to: " + destinationDir.toAbsolutePath().toString());
+        statusLabel.setText("File destination set to: " + destinationDir.toAbsolutePath());
     }
 
     private void copyFilenameToClipboard() {
