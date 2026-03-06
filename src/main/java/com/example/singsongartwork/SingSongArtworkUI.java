@@ -101,6 +101,7 @@ public class SingSongArtworkUI extends Application {
     private Menu roleMenu;
     private MenuButton optionsMenu;
     private MenuButton helpMenu; // Class-level to allow dynamic updates
+    private PlaybackBarBuilder playbackBarBuilder;
     private final StringBuilder appLogBuffer = new StringBuilder();
 
     @Override
@@ -831,7 +832,11 @@ public class SingSongArtworkUI extends Application {
 
             invokeMediaPlayerVoid("setOnReady", (Runnable) () -> {
                 Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
-                playbackSlider.setMax(Math.max(total.toSeconds(), 0));
+                if (playbackBarBuilder != null) {
+                    playbackBarBuilder.setMaxDuration(Math.max(total.toSeconds(), 0));
+                } else {
+                    playbackSlider.setMax(Math.max(total.toSeconds(), 0));
+                }
                 updatePlaybackUi();
             });
 
@@ -840,10 +845,15 @@ public class SingSongArtworkUI extends Application {
                 observable.addListener((obs, oldTime, newTime) -> {
                     Duration current = safeToDuration(newTime);
                     Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
-                    if (!scrubbingPlayback) {
-                        playbackSlider.setValue(current.toSeconds());
+                    if (playbackBarBuilder != null) {
+                        playbackBarBuilder.updateSliderPosition(current.toSeconds());
+                        playbackBarBuilder.setTime(formatDuration(current), formatDuration(total));
+                    } else {
+                        if (!scrubbingPlayback) {
+                            playbackSlider.setValue(current.toSeconds());
+                        }
+                        playbackTimeLabel.setText(formatDuration(current) + " / " + formatDuration(total));
                     }
-                    playbackTimeLabel.setText(formatDuration(current) + " / " + formatDuration(total));
                 });
             }
 
@@ -853,7 +863,11 @@ public class SingSongArtworkUI extends Application {
             });
 
             invokeMediaPlayerVoid("play");
-            nowPlayingLabel.setText("Now Playing: " + track.getFilename());
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.setNowPlaying("Now Playing: " + track.getFilename());
+            } else {
+                nowPlayingLabel.setText("Now Playing: " + track.getFilename());
+            }
             statusLabel.setText("Playing: " + track.getFilename() + " | URI: " + mediaSource);
             updatePlaybackUi();
         } catch (Exception ex) {
@@ -988,7 +1002,11 @@ public class SingSongArtworkUI extends Application {
     private void stopPlayback() {
         if (mediaPlayer != null) {
             invokeMediaPlayerVoid("stop");
-            playbackSlider.setValue(0);
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.resetSlider();
+            } else {
+                playbackSlider.setValue(0);
+            }
             updatePlaybackUi();
         }
     }
@@ -1006,22 +1024,33 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void updatePlaybackUi() {
-        if (playbackPlayPauseButton == null) {
+        if (playbackPlayPauseButton == null && playbackBarBuilder == null) {
             return;
         }
 
         if (mediaPlayer == null) {
-            playbackPlayPauseButton.setText("▶");
-            playbackStopButton.setDisable(true);
-            if (nowPlayingLabel != null && (nowPlayingLabel.getText() == null || nowPlayingLabel.getText().isBlank())) {
-                nowPlayingLabel.setText("Now Playing: -");
-            }
-            if (playbackTimeLabel != null) {
-                playbackTimeLabel.setText("00:00 / 00:00");
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.setPlayingState(false);
+                playbackBarBuilder.setStopEnabled(false);
+                playbackBarBuilder.setTime("00:00", "00:00");
+            } else {
+                playbackPlayPauseButton.setText("▶");
+                playbackStopButton.setDisable(true);
+                if (nowPlayingLabel != null && (nowPlayingLabel.getText() == null || nowPlayingLabel.getText().isBlank())) {
+                    nowPlayingLabel.setText("Now Playing: -");
+                }
+                if (playbackTimeLabel != null) {
+                    playbackTimeLabel.setText("00:00 / 00:00");
+                }
             }
         } else {
-            playbackPlayPauseButton.setText(isMediaPlaying() ? "⏸" : "▶");
-            playbackStopButton.setDisable(false);
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.setPlayingState(isMediaPlaying());
+                playbackBarBuilder.setStopEnabled(true);
+            } else {
+                playbackPlayPauseButton.setText(isMediaPlaying() ? "⏸" : "▶");
+                playbackStopButton.setDisable(false);
+            }
         }
 
         if (trackTable != null) {
@@ -1040,35 +1069,20 @@ public class SingSongArtworkUI extends Application {
     }
 
     private HBox createPlaybackBar() {
-        nowPlayingLabel = new Label("Now Playing: -");
-        playbackTimeLabel = new Label("00:00 / 00:00");
+        playbackBarBuilder = new PlaybackBarBuilder(
+                this::toggleGlobalPlayback,
+                this::stopPlayback,
+                duration -> {
+                    if (mediaPlayer != null) {
+                        invokeMediaPlayerVoid("seek", duration);
+                    }
+                }
+        );
 
-        playbackPlayPauseButton = new Button("▶");
-        playbackPlayPauseButton.setOnAction(e -> toggleGlobalPlayback());
-
-        playbackStopButton = new Button("■");
-        playbackStopButton.setOnAction(e -> stopPlayback());
-        playbackStopButton.setDisable(true);
-
-        playbackSlider = new Slider(0, 0, 0);
-        playbackSlider.setPrefWidth(320);
-        playbackSlider.setOnMousePressed(e -> scrubbingPlayback = true);
-        playbackSlider.setOnMouseReleased(e -> {
-            if (mediaPlayer != null) {
-                invokeMediaPlayerVoid("seek", Duration.seconds(playbackSlider.getValue()));
-            }
-            scrubbingPlayback = false;
-        });
-
-        HBox spacer = new HBox();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        HBox playbackBar = new HBox(10);
-        playbackBar.getStyleClass().add("status-bar");
-        playbackBar.setPadding(new Insets(8, 14, 8, 14));
-        playbackBar.setAlignment(Pos.CENTER_LEFT);
-        playbackBar.getChildren().addAll(nowPlayingLabel, spacer, playbackSlider, playbackTimeLabel, playbackPlayPauseButton, playbackStopButton);
-        return playbackBar;
+        // Keep legacy fields assigned for compatibility with existing code paths.
+        HBox bar = playbackBarBuilder.buildBar();
+        playbackSlider = playbackBarBuilder.getSeekSlider();
+        return bar;
     }
 
     private VBox createBottomPanel() {
