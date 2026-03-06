@@ -101,6 +101,7 @@ public class SingSongArtworkUI extends Application {
     private Menu roleMenu;
     private MenuButton optionsMenu;
     private MenuButton helpMenu; // Class-level to allow dynamic updates
+    private MenuBarBuilder menuBarBuilder;
     private FilterPanelBuilder filterPanelBuilder;
     private CheckMenuItem showChoicesOnlyMenuItem;
     private PlaybackBarBuilder playbackBarBuilder;
@@ -124,216 +125,56 @@ public class SingSongArtworkUI extends Application {
         Label titleLabel = new Label("SingSongArtwork");
         titleLabel.setStyle("-fx-text-fill: #00d9ff; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 8px 16px;");
 
-        // Hamburger menu (☰)
-        String topIconStyle = "-fx-background-color: transparent; -fx-text-fill: #ffffff; -fx-font-size: 12px; -fx-font-weight: normal; -fx-padding: 8px 12px; -fx-background-radius: 0; -fx-border-width: 0;";
-        String menuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
+        // Hamburger and options menus are now composed via MenuBarBuilder.
+        menuBarBuilder = new MenuBarBuilder(
+                this::showAppLogDialog,
+                () -> showMarkdownFile("README.md", "README"),
+                () -> showMarkdownFile("LICENSE.md", "LICENSE"),
+                this::showKeyboardShortcuts,
+                this::openDirectoryChooser,
+                () -> {
+                    if (currentDirectory != null) {
+                        if (showDirectoryPreview(currentDirectory)) {
+                            loadTracksAsync(currentDirectory);
+                        }
+                    } else if (statusLabel != null) {
+                        statusLabel.setText("Error: No music directory set. Please choose a music directory first.");
+                    }
+                },
+                this::openDirectoryChooser,
+                this::chooseCopyDirectory,
+                selected -> {
+                    if (filterPanelBuilder != null) {
+                        filterPanelBuilder.setShowChoicesOnly(selected);
+                        syncShowChoicesStateFromBuilder();
+                        applyFilter();
+                    }
+                },
+                this::copyChoicesTracksToCopyDirectory,
+                this::clearChoicesTracks,
+                mode -> {
+                    moreColumnsMode = mode == 1;
+                    applyColumnMode();
+                    saveUiPreferences();
+                },
+                this::handleRoleChangeRequested
+        );
 
-        helpMenu = new MenuButton("☰");
-        helpMenu.setStyle(topIconStyle);
-        helpMenu.getStyleClass().add("icon-menu-button");
-        MenuItem appLogItem = new MenuItem("Show app log...");
-        appLogItem.setStyle(menuItemStyle);
-        appLogItem.setOnAction(e -> showAppLogDialog());
-        helpMenu.getItems().add(appLogItem);
+        var menus = menuBarBuilder.buildMenus();
+        helpMenu = menus.getKey();
+        optionsMenu = menus.getValue();
+        userRoleItem = menuBarBuilder.getUserRoleItem();
+        adminRoleItem = menuBarBuilder.getAdminRoleItem();
 
-        MenuItem readmeItem = new MenuItem("README...");
-        readmeItem.setStyle(menuItemStyle);
-        readmeItem.setOnAction(e -> showMarkdownFile("README.md", "README"));
-        helpMenu.getItems().add(readmeItem);
-
-        MenuItem licenseItem = new MenuItem("LICENSE...");
-        licenseItem.setStyle(menuItemStyle);
-        licenseItem.setOnAction(e -> showMarkdownFile("LICENSE.md", "LICENSE"));
-        helpMenu.getItems().add(licenseItem);
-
-        MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
-        shortcutsItem.setStyle(menuItemStyle);
-        shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
-        // Only show shortcuts in Admin mode
-        if (adminMode) {
-            helpMenu.getItems().add(new SeparatorMenuItem());
-            helpMenu.getItems().add(shortcutsItem);
-        }
+        // Keep startup state synced with current role.
+        menuBarBuilder.updateForAdminMode(adminMode);
+        menuBarBuilder.rebuildOptionsMenu(adminMode);
 
         // Spacer to push three-dot menu to the right
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Three-dot menu (⋮) on far right
-        optionsMenu = new MenuButton("⋮");
-        optionsMenu.setStyle(topIconStyle);
-        optionsMenu.getStyleClass().add("icon-menu-button");
-
-        // File music directory info as menu label (non-clickable)
-        CustomMenuItem musicDirectoryMenuItem = new CustomMenuItem();
-        VBox musicDirectoryInfo = new VBox(3);
-        musicDirectoryInfo.setPadding(new Insets(6, 12, 6, 12));
-        Label musicDirectoryTitleLabel = new Label("Music directory:");
-        musicDirectoryTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-        musicDirectoryLabel = new Label("No directory selected");
-        musicDirectoryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
-        musicDirectoryLabel.setWrapText(true);
-        musicDirectoryLabel.setMaxWidth(300);
-        musicDirectoryInfo.getChildren().addAll(musicDirectoryTitleLabel, musicDirectoryLabel);
-        musicDirectoryMenuItem.setContent(musicDirectoryInfo);
-        musicDirectoryMenuItem.setHideOnClick(false);
-
-        // File copy directory info as menu label (non-clickable)
-        CustomMenuItem copyDirectoryMenuItem = new CustomMenuItem();
-        VBox copyDirectoryInfo = new VBox(3);
-        copyDirectoryInfo.setPadding(new Insets(6, 12, 6, 12));
-        Label copyDirectoryTitleLabel = new Label("File destination:");
-        copyDirectoryTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-        copyDirectoryLabel = new Label("Not set");
-        copyDirectoryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
-        copyDirectoryLabel.setWrapText(true);
-        copyDirectoryLabel.setMaxWidth(300);
-        copyDirectoryInfo.getChildren().addAll(copyDirectoryTitleLabel, copyDirectoryLabel);
-        copyDirectoryMenuItem.setContent(copyDirectoryInfo);
-        copyDirectoryMenuItem.setHideOnClick(false);
-
-        SeparatorMenuItem separator1 = new SeparatorMenuItem();
-
-        MenuItem chooseMusicDirectoryItem = new MenuItem("Choose music directory...");
-        chooseMusicDirectoryItem.setStyle(menuItemStyle);
-        chooseMusicDirectoryItem.setOnAction(e -> openDirectoryChooser());
-
-        MenuItem reloadItem = new MenuItem("Reload music files");
-        reloadItem.setStyle(menuItemStyle);
-        reloadItem.setOnAction(e -> {
-            if (currentDirectory != null) {
-                // Show directory preview, then load
-                if (showDirectoryPreview(currentDirectory)) {
-                    loadTracksAsync(currentDirectory);
-                }
-            } else {
-                statusLabel.setText("Error: No music directory set. Please choose a music directory first.");
-            }
-        });
-
-        SeparatorMenuItem separator2 = new SeparatorMenuItem();
-
-        CheckMenuItem showChoicesOnlyItem = new CheckMenuItem("Show choices");
-        showChoicesOnlyMenuItem = showChoicesOnlyItem;
-        showChoicesOnlyItem.setStyle(menuItemStyle);
-        showChoicesOnlyItem.setSelected(showChoicesOnly);
-        showChoicesOnlyItem.setOnAction(e -> {
-            if (filterPanelBuilder != null) {
-                filterPanelBuilder.setShowChoicesOnly(showChoicesOnlyItem.isSelected());
-                syncShowChoicesStateFromBuilder();
-            } else {
-                showChoicesOnly = showChoicesOnlyItem.isSelected();
-                if (showChoicesOnly) {
-                    retainedFilterText = filterTextField.getText();
-                    filterTextField.setText("");
-                    filterTextField.setDisable(true);
-                } else {
-                    filterTextField.setDisable(false);
-                    filterTextField.setText(retainedFilterText);
-                }
-            }
-            applyFilter();
-        });
-
-        MenuItem copyChoicesItem = new MenuItem("Copy choices to...");
-        copyChoicesItem.setStyle(menuItemStyle);
-        copyChoicesItem.setOnAction(e -> copyChoicesTracksToCopyDirectory());
-
-        MenuItem clearChoicesItem = new MenuItem("Clear choices");
-        clearChoicesItem.setStyle(menuItemStyle);
-        clearChoicesItem.setOnAction(e -> clearChoicesTracks());
-
-        // Column Mode toggle (default: Less)
-        Menu columnModeMenu = new Menu("Column Mode");
-        columnModeMenu.setStyle(menuItemStyle);
-        ToggleGroup columnModeGroup = new ToggleGroup();
-        RadioMenuItem lessColumnsItem = new RadioMenuItem("Less");
-        lessColumnsItem.setStyle(menuItemStyle);
-        lessColumnsItem.setToggleGroup(columnModeGroup);
-        lessColumnsItem.setSelected(!moreColumnsMode);
-        lessColumnsItem.setOnAction(e -> {
-            moreColumnsMode = false;
-            applyColumnMode();
-            saveUiPreferences();
-        });
-        RadioMenuItem moreColumnsItem = new RadioMenuItem("More");
-        moreColumnsItem.setStyle(menuItemStyle);
-        moreColumnsItem.setToggleGroup(columnModeGroup);
-        moreColumnsItem.setSelected(moreColumnsMode);
-        moreColumnsItem.setOnAction(e -> {
-            moreColumnsMode = true;
-            applyColumnMode();
-            saveUiPreferences();
-        });
-        columnModeMenu.getItems().addAll(lessColumnsItem, moreColumnsItem);
-
-        // Admin-only menu item - declare before role menu
-        MenuItem chooseCopyDirectoryItem = new MenuItem("Choose file destination...");
-        chooseCopyDirectoryItem.setStyle(menuItemStyle);
-        chooseCopyDirectoryItem.setOnAction(e -> chooseCopyDirectory());
-
-        // Role toggle (default: User) - currently no behavioral effect.
-        roleMenu = new Menu("Role");
-        roleMenu.setStyle(menuItemStyle);
-        ToggleGroup roleGroup = new ToggleGroup();
-
-        // Declare both RadioMenuItems first to avoid scope issues
-        userRoleItem = new RadioMenuItem("User");
-        adminRoleItem = new RadioMenuItem("Admin");
-
-        userRoleItem.setStyle(menuItemStyle);
-        userRoleItem.setToggleGroup(roleGroup);
-        userRoleItem.setSelected(!adminMode);
-        userRoleItem.setOnAction(e -> {
-            if (adminMode) { // Only update if actually switching from Admin to User
-                adminMode = false;
-                userRoleItem.setSelected(true);
-                adminRoleItem.setSelected(false);
-                refreshContextMenuForRole();
-                updateHelpMenuForRole();
-                // Rebuild options menu based on new admin mode
-                rebuildOptionsMenu(optionsMenu, musicDirectoryMenuItem, copyDirectoryMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseCopyDirectoryItem, columnModeMenu, roleMenu);
-                saveUiPreferences();
-                if (statusLabel != null) {
-                    statusLabel.setText("Role switched to User mode");
-                }
-            }
-        });
-
-        adminRoleItem.setStyle(menuItemStyle);
-        adminRoleItem.setToggleGroup(roleGroup);
-        adminRoleItem.setSelected(adminMode);
-        adminRoleItem.setOnAction(e -> {
-            if (!adminMode) { // Only update if actually switching from User to Admin
-                if (!promptForAdminPassword()) {
-                    // Revert selection when authentication fails or is canceled.
-                    userRoleItem.setSelected(true);
-                    adminRoleItem.setSelected(false);
-                    if (statusLabel != null) {
-                        statusLabel.setText("Admin mode access denied");
-                    }
-                    return;
-                }
-                adminMode = true;
-                adminRoleItem.setSelected(true);
-                userRoleItem.setSelected(false);
-                refreshContextMenuForRole();
-                updateHelpMenuForRole();
-                // Rebuild options menu based on new admin mode
-                rebuildOptionsMenu(optionsMenu, musicDirectoryMenuItem, copyDirectoryMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseCopyDirectoryItem, columnModeMenu, roleMenu);
-                saveUiPreferences();
-                if (statusLabel != null) {
-                    statusLabel.setText("Role switched to Admin mode");
-                }
-            }
-        });
-        roleMenu.getItems().addAll(userRoleItem, adminRoleItem);
-
-
-        // Build initial optionsMenu
-        rebuildOptionsMenu(optionsMenu, musicDirectoryMenuItem, copyDirectoryMenuItem, separator1, reloadItem, separator2, showChoicesOnlyItem, copyChoicesItem, clearChoicesItem, chooseCopyDirectoryItem, columnModeMenu, roleMenu);
-
-        titleBar.getChildren().addAll(titleLabel, helpMenu, spacer, optionsMenu);
+        titleBar.getChildren().addAll(titleLabel, spacer, helpMenu, optionsMenu);
 
         // Top section: title bar + controls
         VBox topSection = new VBox();
@@ -502,7 +343,9 @@ public class SingSongArtworkUI extends Application {
             // Show preview of MP3 files in the directory
             if (showDirectoryPreview(selected.toPath())) {
                 currentDirectory = selected.toPath();
-                musicDirectoryLabel.setText(selected.getAbsolutePath());
+                if (menuBarBuilder != null) {
+                    menuBarBuilder.setMusicDirectory(selected.getAbsolutePath());
+                }
                 saveLastMusicDirectory(selected.toPath());
                 loadTracks(selected.toPath());
             }
@@ -1464,6 +1307,11 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void updateHelpMenuForRole() {
+        if (menuBarBuilder != null) {
+            menuBarBuilder.updateForAdminMode(adminMode);
+            helpMenu = menuBarBuilder.getHelpMenu();
+            return;
+        }
         if (helpMenu != null) {
             helpMenu.getItems().clear();
 
@@ -1505,6 +1353,13 @@ public class SingSongArtworkUI extends Application {
                                     MenuItem chooseCopyDirectoryItem,
                                     Menu columnModeMenu,
                                     Menu roleMenu) {
+        if (menuBarBuilder != null) {
+            menuBarBuilder.rebuildOptionsMenu(adminMode);
+            this.optionsMenu = menuBarBuilder.getOptionsMenu();
+            this.userRoleItem = menuBarBuilder.getUserRoleItem();
+            this.adminRoleItem = menuBarBuilder.getAdminRoleItem();
+            return;
+        }
         optionsMenu.getItems().clear();
 
         // Always visible items
@@ -1558,6 +1413,9 @@ public class SingSongArtworkUI extends Application {
         saveLastCopyDirectory(copyDirectory);
 
         // Update the copy directory label in the three-dot menu with full path
+        if (menuBarBuilder != null) {
+            menuBarBuilder.setCopyDirectory(copyDirectory.toAbsolutePath().toString());
+        }
         if (copyDirectoryLabel != null) {
             copyDirectoryLabel.setText(copyDirectory.toAbsolutePath().toString());
         }
@@ -1763,14 +1621,24 @@ public class SingSongArtworkUI extends Application {
         Path lastPath = configManager.getLastMusicDirectory();
         if (lastPath != null && Files.isDirectory(lastPath)) {
             currentDirectory = lastPath;
-            musicDirectoryLabel.setText(lastPath.toString());
+            if (menuBarBuilder != null) {
+                menuBarBuilder.setMusicDirectory(lastPath.toString());
+            }
+            if (musicDirectoryLabel != null) {
+                musicDirectoryLabel.setText(lastPath.toString());
+            }
         }
     }
 
     private void initializeLastCopyDirectory() {
         Path lastPath = configManager.getLastCopyDirectory();
-        if (lastPath != null && Files.isDirectory(lastPath) && copyDirectoryLabel != null) {
-            copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());
+        if (lastPath != null && Files.isDirectory(lastPath)) {
+            if (menuBarBuilder != null) {
+                menuBarBuilder.setCopyDirectory(lastPath.toAbsolutePath().toString());
+            }
+            if (copyDirectoryLabel != null) {
+                copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());
+            }
         }
     }
 
@@ -1809,6 +1677,46 @@ public class SingSongArtworkUI extends Application {
         } catch (IOException ex) {
             statusLabel.setText("Error reading " + filename + ": " + ex.getMessage());
         }
+    }
+
+    private void handleRoleChangeRequested(boolean requestAdmin) {
+        if (requestAdmin == adminMode) {
+            return;
+        }
+
+        if (requestAdmin) {
+            if (!promptForAdminPassword()) {
+                if (userRoleItem != null) {
+                    userRoleItem.setSelected(true);
+                }
+                if (adminRoleItem != null) {
+                    adminRoleItem.setSelected(false);
+                }
+                if (statusLabel != null) {
+                    statusLabel.setText("Admin mode access denied");
+                }
+                return;
+            }
+            adminMode = true;
+            if (statusLabel != null) {
+                statusLabel.setText("Role switched to Admin mode");
+            }
+        } else {
+            adminMode = false;
+            if (statusLabel != null) {
+                statusLabel.setText("Role switched to User mode");
+            }
+        }
+
+        refreshContextMenuForRole();
+        updateHelpMenuForRole();
+        if (menuBarBuilder != null) {
+            menuBarBuilder.rebuildOptionsMenu(adminMode);
+            optionsMenu = menuBarBuilder.getOptionsMenu();
+            userRoleItem = menuBarBuilder.getUserRoleItem();
+            adminRoleItem = menuBarBuilder.getAdminRoleItem();
+        }
+        saveUiPreferences();
     }
 
     public static void main(String[] args) {
