@@ -186,7 +186,7 @@ public class SingSongArtworkUI extends Application {
 
         // Center: table
         tableBuilder = new TrackTableBuilder(
-                this::getArtworkBytesForItem,
+                () -> new byte[0],  // Artwork bytes will be handled per-item in cell factory
                 this::onTransportClicked,
                 ignored -> {
                     if (showChoicesOnly) {
@@ -1290,6 +1290,290 @@ public class SingSongArtworkUI extends Application {
             adminRoleItem = menuBarBuilder.getAdminRoleItem();
         }
         saveUiPreferences();
+    }
+
+    private boolean isCurrentTrack(TrackEntry track) {
+        return track != null && playingTrackPath != null && playingTrackPath.equals(track.getFilePath());
+    }
+
+    private void onTransportClicked(TrackEntry track) {
+        if (track == null) {
+            return;
+        }
+
+        if (isCurrentTrack(track) && mediaPlayer != null) {
+            if (isMediaPlaying()) {
+                invokeMediaPlayerVoid("pause");
+            } else {
+                invokeMediaPlayerVoid("play");
+            }
+            updatePlaybackUi();
+            return;
+        }
+
+        startPlayback(track);
+    }
+
+    private void startPlayback(TrackEntry track) {
+        disposeMediaPlayer();
+        playingTrackPath = track.getFilePath();
+
+        try {
+            String mediaSource = toJavaFxMediaUri(playingTrackPath);
+            statusLabel.setText("Media URI: " + mediaSource);
+            System.out.println("[SingSongArtwork] Media URI: " + mediaSource);
+
+            mediaPlayer = createMediaPlayer(mediaSource);
+
+            invokeMediaPlayerVoid("setOnReady", (Runnable) () -> {
+                Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
+                if (playbackBarBuilder != null) {
+                    playbackBarBuilder.setMaxDuration(Math.max(total.toSeconds(), 0));
+                } else {
+                    playbackSlider.setMax(Math.max(total.toSeconds(), 0));
+                }
+                updatePlaybackUi();
+            });
+
+            Object currentTimeProperty = invokeMediaPlayer("currentTimeProperty");
+            if (currentTimeProperty instanceof javafx.beans.value.ObservableValue<?> observable) {
+                observable.addListener((obs, oldTime, newTime) -> {
+                    Duration current = safeToDuration(newTime);
+                    Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
+                    if (playbackBarBuilder != null) {
+                        playbackBarBuilder.updateSliderPosition(current.toSeconds());
+                        playbackBarBuilder.setTime(formatDuration(current), formatDuration(total));
+                    } else {
+                        if (!scrubbingPlayback) {
+                            playbackSlider.setValue(current.toSeconds());
+                        }
+                        playbackTimeLabel.setText(formatDuration(current) + " / " + formatDuration(total));
+                    }
+                });
+            }
+
+            invokeMediaPlayerVoid("setOnEndOfMedia", (Runnable) () -> {
+                invokeMediaPlayerVoid("stop");
+                updatePlaybackUi();
+            });
+
+            invokeMediaPlayerVoid("play");
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.setNowPlaying("Now Playing: " + track.getFilename());
+            } else {
+                nowPlayingLabel.setText("Now Playing: " + track.getFilename());
+            }
+            statusLabel.setText("Playing: " + track.getFilename() + " | URI: " + mediaSource);
+            updatePlaybackUi();
+        } catch (Exception ex) {
+            statusLabel.setText("Playback error for " + track.getFilename() + ": " + ex.getMessage());
+            disposeMediaPlayer();
+        }
+    }
+
+    private String toJavaFxMediaUri(Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        URI fileUri = absolute.toUri();
+        String uriString = fileUri.toString();
+
+        if (uriString.startsWith("file://") && !uriString.startsWith("file:///")) {
+            uriString = "file:////" + uriString.substring("file://".length());
+        }
+
+        return uriString;
+    }
+
+    private boolean isMediaPlaying() {
+        if (mediaPlayer == null) {
+            return false;
+        }
+        Object status = invokeMediaPlayer("getStatus");
+        return status != null && "PLAYING".equals(String.valueOf(status));
+    }
+
+    private Object createMediaPlayer(String mediaSource) {
+        try {
+            Class<?> mediaClass = Class.forName("javafx.scene.media.Media");
+            Object media = mediaClass.getConstructor(String.class).newInstance(mediaSource);
+            Class<?> mediaPlayerClass = Class.forName("javafx.scene.media.MediaPlayer");
+            return mediaPlayerClass.getConstructor(mediaClass).newInstance(media);
+        } catch (ClassNotFoundException ex) {
+            String msg = "JavaFX media module not found. The javafx.media module is not on the module path.";
+            System.err.println("[ERROR] " + msg);
+            throw new RuntimeException(msg, ex);
+        } catch (java.lang.reflect.InvocationTargetException ex) {
+            String msg = "JavaFX Media failed to initialize: " + ex.getCause();
+            System.err.println("[ERROR] " + msg);
+            throw new RuntimeException(msg, ex.getCause());
+        } catch (Exception ex) {
+            String msg = "JavaFX media module error: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
+            System.err.println("[ERROR] " + msg);
+            throw new RuntimeException(msg, ex);
+        }
+    }
+
+    private Object invokeMediaPlayer(String methodName, Object... args) {
+        if (mediaPlayer == null) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Method method = findCompatibleMethod(mediaPlayer.getClass(), methodName, args);
+            if (method == null) {
+                return null;
+            }
+            return method.invoke(mediaPlayer, args);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private java.lang.reflect.Method findCompatibleMethod(Class<?> type, String methodName, Object[] args) {
+        for (java.lang.reflect.Method method : type.getMethods()) {
+            if (!method.getName().equals(methodName)) {
+                continue;
+            }
+            Class<?>[] paramTypes = method.getParameterTypes();
+            if (paramTypes.length != args.length) {
+                continue;
+            }
+            boolean matches = true;
+            for (int i = 0; i < paramTypes.length; i++) {
+                Object arg = args[i];
+                if (arg == null) {
+                    continue;
+                }
+                if (!paramTypes[i].isAssignableFrom(arg.getClass())) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private void invokeMediaPlayerVoid(String methodName, Object... args) {
+        invokeMediaPlayer(methodName, args);
+    }
+
+    private Duration safeToDuration(Object value) {
+        if (value instanceof Duration d) {
+            return d;
+        }
+        return Duration.ZERO;
+    }
+
+    private void toggleGlobalPlayback() {
+        if (mediaPlayer == null) {
+            TrackEntry selected = trackTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                startPlayback(selected);
+            } else {
+                statusLabel.setText("Select a track to play.");
+            }
+            return;
+        }
+
+        if (isMediaPlaying()) {
+            invokeMediaPlayerVoid("pause");
+        } else {
+            invokeMediaPlayerVoid("play");
+        }
+        updatePlaybackUi();
+    }
+
+    private void stopPlayback() {
+        if (mediaPlayer != null) {
+            invokeMediaPlayerVoid("stop");
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.resetSlider();
+            } else {
+                playbackSlider.setValue(0);
+            }
+            updatePlaybackUi();
+        }
+    }
+
+    private void disposeMediaPlayer() {
+        if (mediaPlayer != null) {
+            try {
+                invokeMediaPlayerVoid("stop");
+                invokeMediaPlayerVoid("dispose");
+            } catch (Exception ignored) {
+                // Ignore dispose edge cases from platform media backends.
+            }
+            mediaPlayer = null;
+        }
+    }
+
+    private void updatePlaybackUi() {
+        if (playbackPlayPauseButton == null && playbackBarBuilder == null) {
+            return;
+        }
+
+        if (mediaPlayer == null) {
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.setPlayingState(false);
+                playbackBarBuilder.setStopEnabled(false);
+                playbackBarBuilder.setTime("00:00", "00:00");
+            } else {
+                playbackPlayPauseButton.setText("▶");
+                playbackStopButton.setDisable(true);
+                if (nowPlayingLabel != null && (nowPlayingLabel.getText() == null || nowPlayingLabel.getText().isBlank())) {
+                    nowPlayingLabel.setText("Now Playing: -");
+                }
+                if (playbackTimeLabel != null) {
+                    playbackTimeLabel.setText("00:00 / 00:00");
+                }
+            }
+        } else {
+            if (playbackBarBuilder != null) {
+                playbackBarBuilder.setPlayingState(isMediaPlaying());
+                playbackBarBuilder.setStopEnabled(true);
+            } else {
+                playbackPlayPauseButton.setText(isMediaPlaying() ? "⏸" : "▶");
+                playbackStopButton.setDisable(false);
+            }
+        }
+
+        if (trackTable != null) {
+            trackTable.refresh();
+        }
+    }
+
+    private String formatDuration(Duration duration) {
+        if (duration == null || duration.isUnknown() || duration.lessThanOrEqualTo(Duration.ZERO)) {
+            return "00:00";
+        }
+        int totalSeconds = (int) Math.floor(duration.toSeconds());
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+        return String.format("%02d:%02d", minutes, seconds);
+    }
+
+    private HBox createPlaybackBar() {
+        playbackBarBuilder = new PlaybackBarBuilder(
+                this::toggleGlobalPlayback,
+                this::stopPlayback,
+                duration -> {
+                    if (mediaPlayer != null) {
+                        invokeMediaPlayerVoid("seek", duration);
+                    }
+                }
+        );
+
+        HBox bar = playbackBarBuilder.buildBar();
+        playbackSlider = playbackBarBuilder.getSeekSlider();
+        return bar;
+    }
+
+    private VBox createBottomPanel() {
+        VBox bottom = new VBox();
+        bottom.getChildren().add(createPlaybackBar());
+        bottom.getChildren().add(createStatusBar());
+        return bottom;
     }
 
     public static void main(String[] args) {
