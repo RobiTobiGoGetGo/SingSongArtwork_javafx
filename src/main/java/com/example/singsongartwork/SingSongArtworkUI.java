@@ -131,6 +131,16 @@ public class SingSongArtworkUI extends Application {
         appLogItem.setOnAction(e -> showAppLogDialog());
         helpMenu.getItems().add(appLogItem);
 
+        MenuItem readmeItem = new MenuItem("README...");
+        readmeItem.setStyle(menuItemStyle);
+        readmeItem.setOnAction(e -> showMarkdownFile("README.md", "README"));
+        helpMenu.getItems().add(readmeItem);
+
+        MenuItem licenseItem = new MenuItem("LICENSE...");
+        licenseItem.setStyle(menuItemStyle);
+        licenseItem.setOnAction(e -> showMarkdownFile("LICENSE.md", "LICENSE"));
+        helpMenu.getItems().add(licenseItem);
+
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
         shortcutsItem.setStyle(menuItemStyle);
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
@@ -1669,6 +1679,16 @@ public class SingSongArtworkUI extends Application {
             appLogItem.setOnAction(e -> showAppLogDialog());
             helpMenu.getItems().add(appLogItem);
 
+            MenuItem readmeItem = new MenuItem("README...");
+            readmeItem.setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
+            readmeItem.setOnAction(e -> showMarkdownFile("README.md", "README"));
+            helpMenu.getItems().add(readmeItem);
+
+            MenuItem licenseItem = new MenuItem("LICENSE...");
+            licenseItem.setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
+            licenseItem.setOnAction(e -> showMarkdownFile("LICENSE.md", "LICENSE"));
+            helpMenu.getItems().add(licenseItem);
+
             if (adminMode) {
                 // Add shortcuts item in Admin mode
                 MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
@@ -2120,6 +2140,35 @@ public class SingSongArtworkUI extends Application {
             .append("] ")
             .append(message)
             .append(System.lineSeparator());
+    }
+
+    private void showMarkdownFile(String filename, String title) {
+        try {
+            Path mdPath = Paths.get(filename);
+            if (!Files.exists(mdPath)) {
+                statusLabel.setText("Error: " + filename + " not found");
+                return;
+            }
+
+            String content = Files.readString(mdPath);
+
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle(title);
+            dialog.setHeaderText(filename);
+
+            TextArea textArea = new TextArea(content);
+            textArea.setEditable(false);
+            textArea.setWrapText(true);
+            textArea.setPrefRowCount(30);
+            textArea.setPrefColumnCount(100);
+
+            dialog.getDialogPane().setContent(textArea);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            dialog.getDialogPane().setPrefWidth(900);
+            dialog.showAndWait();
+        } catch (IOException ex) {
+            statusLabel.setText("Error reading " + filename + ": " + ex.getMessage());
+        }
     }
 
     public static void main(String[] args) {
