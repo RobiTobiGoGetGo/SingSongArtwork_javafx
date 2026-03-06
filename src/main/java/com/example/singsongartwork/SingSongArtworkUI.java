@@ -101,6 +101,8 @@ public class SingSongArtworkUI extends Application {
     private Menu roleMenu;
     private MenuButton optionsMenu;
     private MenuButton helpMenu; // Class-level to allow dynamic updates
+    private FilterPanelBuilder filterPanelBuilder;
+    private CheckMenuItem showChoicesOnlyMenuItem;
     private PlaybackBarBuilder playbackBarBuilder;
     private final StringBuilder appLogBuffer = new StringBuilder();
 
@@ -212,19 +214,23 @@ public class SingSongArtworkUI extends Application {
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
 
         CheckMenuItem showChoicesOnlyItem = new CheckMenuItem("Show choices");
+        showChoicesOnlyMenuItem = showChoicesOnlyItem;
         showChoicesOnlyItem.setStyle(menuItemStyle);
         showChoicesOnlyItem.setSelected(showChoicesOnly);
         showChoicesOnlyItem.setOnAction(e -> {
-            showChoicesOnly = showChoicesOnlyItem.isSelected();
-            if (showChoicesOnly) {
-                // Save current filter text and disable filter
-                retainedFilterText = filterTextField.getText();
-                filterTextField.setText("");
-                filterTextField.setDisable(true);
+            if (filterPanelBuilder != null) {
+                filterPanelBuilder.setShowChoicesOnly(showChoicesOnlyItem.isSelected());
+                syncShowChoicesStateFromBuilder();
             } else {
-                // Re-enable filter and restore previous filter text
-                filterTextField.setDisable(false);
-                filterTextField.setText(retainedFilterText);
+                showChoicesOnly = showChoicesOnlyItem.isSelected();
+                if (showChoicesOnly) {
+                    retainedFilterText = filterTextField.getText();
+                    filterTextField.setText("");
+                    filterTextField.setDisable(true);
+                } else {
+                    filterTextField.setDisable(false);
+                    filterTextField.setText(retainedFilterText);
+                }
             }
             applyFilter();
         });
@@ -401,109 +407,22 @@ public class SingSongArtworkUI extends Application {
     }
 
     private VBox createTopPanel() {
-        VBox vbox = new VBox(12);
-        vbox.setPadding(new Insets(16));
-        vbox.getStyleClass().add("top-panel");
-
-        // Filter row with loading indicator
-        HBox filterBox = new HBox(12);
-        filterBox.setAlignment(Pos.CENTER_LEFT);
-        filterBox.getStyleClass().add("filter-box");
-
-        Label filterLabel = new Label("Filter:");
-
-        // Create ComboBox with default filter terms
-        ComboBox<String> filterComboBox = new ComboBox<>();
-        filterComboBox.setEditable(true);
-        filterComboBox.setPrefWidth(400);
-        filterComboBox.setPrefHeight(34);
-        filterComboBox.setStyle("-fx-font-size: 13px;");
-        HBox.setHgrow(filterComboBox, Priority.ALWAYS);
-        filterComboBox.setPromptText("Search tracks or select a default term...");
-
-        // Load default terms into ComboBox
-        Set<String> defaultTerms = SearchFilter.getDefaultFilterTerms();
-        if (!defaultTerms.isEmpty()) {
-            filterComboBox.setItems(FXCollections.observableArrayList(defaultTerms.stream().sorted().toList()));
-        }
-
-        // testing if this lands in changes
-        // Get reference to the editor (TextBox inside ComboBox)
-        filterTextField = filterComboBox.getEditor();
-        filterTextField.setOnKeyReleased(e -> applyFilter());
-
-        // Trigger filter when user selects a term from dropdown
-        filterComboBox.setOnAction(e -> {
-            String selectedValue = filterComboBox.getValue();
-            if (selectedValue != null && !selectedValue.isBlank()) {
-                // Make sure the editor text is set to the selected value
-                filterTextField.setText(selectedValue);
-                applyFilter();
-            }
-        });
-
-        String barButtonBaseStyle = "-fx-font-size: 13px; -fx-padding: 6px 10px; -fx-min-height: 34px; -fx-pref-height: 34px;";
-        String barIconButtonStyle = "-fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 0; -fx-min-width: 34px; -fx-pref-width: 34px; -fx-min-height: 34px; -fx-pref-height: 34px;";
-
-        Button clearFilterBtn = new Button("Clear");
-        clearFilterBtn.setStyle(barButtonBaseStyle);
-        clearFilterBtn.setOnAction(e -> {
-            filterComboBox.setValue(null);
-            filterTextField.clear();
-            clearFilter();
-        });
-
-        // Toggle for "Show choices" mode with Check icon
-        Button showChoicesToggleBtn = new Button("☑");
-        showChoicesToggleBtn.setStyle(barIconButtonStyle + " -fx-opacity: 0.6;");
-        showChoicesToggleBtn.setTooltip(new Tooltip("Toggle show choices only"));
-        showChoicesToggleBtn.setOnAction(e -> {
-            showChoicesOnly = !showChoicesOnly;
-            if (showChoicesOnly) {
-                // Save current filter text and disable filter
-                retainedFilterText = filterTextField.getText();
-                filterTextField.setText("");
-                filterTextField.setDisable(true);
-            } else {
-                // Re-enable filter and restore previous filter text
-                filterTextField.setDisable(false);
-                filterTextField.setText(retainedFilterText);
-            }
-            applyFilter();
-            statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
-            // Keep active/inactive feedback while preserving shared button sizing.
-            showChoicesToggleBtn.setStyle(showChoicesOnly
-                ? barIconButtonStyle + " -fx-opacity: 1.0;"
-                : barIconButtonStyle + " -fx-opacity: 0.6;");
-        });
-
-        // Copy choices to copy directory button with CD icon
-        Button copyChoicesBtn = new Button("💿");
-        copyChoicesBtn.setStyle(barButtonBaseStyle);
-        copyChoicesBtn.setTooltip(new Tooltip("Copy choices to copy directory"));
-        copyChoicesBtn.setOnAction(e -> copyChoicesTracksToCopyDirectory());
-
-        // Loading indicator
-        loadingIndicator = new ProgressIndicator();
-        loadingIndicator.setVisible(false);
-        loadingIndicator.setManaged(false);
-        loadingIndicator.setPrefSize(24, 24);
-
-        Region rightSpacer = new Region();
-        HBox.setHgrow(rightSpacer, Priority.ALWAYS);
-
-        filterBox.getChildren().addAll(
-            showChoicesToggleBtn,
-            filterLabel,
-            filterComboBox,
-            clearFilterBtn,
-            loadingIndicator,
-            rightSpacer,
-            copyChoicesBtn
+        filterPanelBuilder = new FilterPanelBuilder(
+                SearchFilter.getDefaultFilterTerms(),
+                ignored -> applyFilter(),
+                () -> {
+                    syncShowChoicesStateFromBuilder();
+                    applyFilter();
+                    if (statusLabel != null) {
+                        statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
+                    }
+                },
+                this::copyChoicesTracksToCopyDirectory
         );
-
-        vbox.getChildren().add(filterBox);
-        return vbox;
+        VBox panel = filterPanelBuilder.buildPanel();
+        // Keep legacy field for existing shortcuts/focus logic.
+        filterTextField = filterPanelBuilder.getFilterTextField();
+        return panel;
     }
 
     private void configureKeyboardShortcuts(Scene scene) {
@@ -523,7 +442,12 @@ public class SingSongArtworkUI extends Application {
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN), this::copyFilenameToClipboard);
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M), () -> setChoicesForSelected(true));
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), () -> {
-            showChoicesOnly = !showChoicesOnly;
+            if (filterPanelBuilder != null) {
+                filterPanelBuilder.setShowChoicesOnly(!showChoicesOnly);
+                syncShowChoicesStateFromBuilder();
+            } else {
+                showChoicesOnly = !showChoicesOnly;
+            }
             applyFilter();
             statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
         });
@@ -1207,12 +1131,14 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void setLoadingState(boolean loading, String message) {
+        if (filterPanelBuilder != null) {
+            filterPanelBuilder.setLoading(loading);
+        } else if (filterTextField != null) {
+            filterTextField.setDisable(loading);
+        }
         if (loadingIndicator != null) {
             loadingIndicator.setVisible(loading);
             loadingIndicator.setManaged(loading);
-        }
-        if (filterTextField != null) {
-            filterTextField.setDisable(loading);
         }
         if (trackTable != null) {
             trackTable.setDisable(loading);
@@ -1220,6 +1146,17 @@ public class SingSongArtworkUI extends Application {
         if (message != null && statusLabel != null) {
             statusLabel.setText(message);
             appendAppLog(message);
+        }
+    }
+
+    private void syncShowChoicesStateFromBuilder() {
+        if (filterPanelBuilder == null) {
+            return;
+        }
+        showChoicesOnly = filterPanelBuilder.isShowChoicesOnly();
+        retainedFilterText = filterPanelBuilder.getRetainedFilterText();
+        if (showChoicesOnlyMenuItem != null && showChoicesOnlyMenuItem.isSelected() != showChoicesOnly) {
+            showChoicesOnlyMenuItem.setSelected(showChoicesOnly);
         }
     }
 

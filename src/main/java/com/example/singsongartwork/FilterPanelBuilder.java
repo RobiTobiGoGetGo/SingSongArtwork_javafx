@@ -19,6 +19,7 @@ public class FilterPanelBuilder {
     private TextField filterTextField;
     private Button showChoicesToggleBtn;
     private ComboBox<String> filterComboBox;
+    private ProgressIndicator loadingIndicator;
     private boolean showChoicesOnly = false;
     private String retainedFilterText = "";
 
@@ -98,8 +99,8 @@ public class FilterPanelBuilder {
         copyChoicesBtn.setTooltip(new Tooltip("Copy choices to copy directory"));
         copyChoicesBtn.setOnAction(e -> onCopyChoices.run());
 
-        // Loading indicator (placeholder)
-        ProgressIndicator loadingIndicator = new ProgressIndicator();
+        // Loading indicator
+        loadingIndicator = new ProgressIndicator();
         loadingIndicator.setVisible(false);
         loadingIndicator.setManaged(false);
         loadingIndicator.setPrefSize(24, 24);
@@ -191,7 +192,34 @@ public class FilterPanelBuilder {
     }
 
     /**
-     * Get the retained filter text (used when toggling show choices).
+     * Expose the underlying filter editor to preserve legacy keyboard focus wiring.
+     */
+    public TextField getFilterTextField() {
+        return filterTextField;
+    }
+
+    /**
+     * Set loading state for the embedded progress indicator.
+     */
+    public void setLoading(boolean loading) {
+        if (loadingIndicator != null) {
+            loadingIndicator.setVisible(loading);
+            loadingIndicator.setManaged(loading);
+        }
+        setFilterDisabled(loading);
+    }
+
+    /**
+     * Synchronize show-choices state from external controls (menu/shortcuts).
+     */
+    public void setShowChoicesOnly(boolean desired) {
+        if (showChoicesOnly != desired) {
+            toggleShowChoices();
+        }
+    }
+
+    /**
+     * Return the current show-choices retained filter value.
      */
     public String getRetainedFilterText() {
         return retainedFilterText;
@@ -213,4 +241,3 @@ public class FilterPanelBuilder {
         }
     }
 }
-
