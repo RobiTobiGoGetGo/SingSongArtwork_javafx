@@ -54,6 +54,7 @@ public class SingSongArtworkUI extends Application {
     private Label statusLabel;
     private Label selectionLabel;
     private Label dirLabel;
+    private Label destLabel;
     private ProgressIndicator loadingIndicator;
     private Path currentDirectory;
     private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
@@ -131,19 +132,33 @@ public class SingSongArtworkUI extends Application {
         optionsMenu.setStyle(topIconStyle);
         optionsMenu.getStyleClass().add("icon-menu-button");
 
-        // Directory info as menu label (non-clickable)
-        CustomMenuItem dirMenuItem = new CustomMenuItem();
-        VBox dirInfo = new VBox(3);
-        dirInfo.setPadding(new Insets(6, 12, 6, 12));
-        Label dirTitleLabel = new Label("Current Directory:");
-        dirTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+        // File source directory info as menu label (non-clickable)
+        CustomMenuItem sourceMenuItem = new CustomMenuItem();
+        VBox sourceInfo = new VBox(3);
+        sourceInfo.setPadding(new Insets(6, 12, 6, 12));
+        Label sourceTitleLabel = new Label("File source:");
+        sourceTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
         dirLabel = new Label("No directory selected");
         dirLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
         dirLabel.setWrapText(true);
         dirLabel.setMaxWidth(300);
-        dirInfo.getChildren().addAll(dirTitleLabel, dirLabel);
-        dirMenuItem.setContent(dirInfo);
-        dirMenuItem.setHideOnClick(false);
+        sourceInfo.getChildren().addAll(sourceTitleLabel, dirLabel);
+        sourceMenuItem.setContent(sourceInfo);
+        sourceMenuItem.setHideOnClick(false);
+
+        // File destination directory info as menu label (non-clickable)
+        CustomMenuItem destMenuItem = new CustomMenuItem();
+        VBox destInfo = new VBox(3);
+        destInfo.setPadding(new Insets(6, 12, 6, 12));
+        Label destTitleLabel = new Label("File destination:");
+        destTitleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+        destLabel = new Label("Not set");
+        destLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
+        destLabel.setWrapText(true);
+        destLabel.setMaxWidth(300);
+        destInfo.getChildren().addAll(destTitleLabel, destLabel);
+        destMenuItem.setContent(destInfo);
+        destMenuItem.setHideOnClick(false);
 
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
 
@@ -249,7 +264,8 @@ public class SingSongArtworkUI extends Application {
         chooseDestinationItem.setOnAction(e -> chooseFileDestination());
 
         optionsMenu.getItems().addAll(
-                dirMenuItem,
+                sourceMenuItem,
+                destMenuItem,
                 separator1,
                 browseItem,
                 reloadItem,
@@ -1393,6 +1409,12 @@ public class SingSongArtworkUI extends Application {
 
         Path destinationDir = selected.toPath();
         saveLastCopyDestination(destinationDir);
+
+        // Update the destination label in the three-dot menu
+        if (destLabel != null) {
+            destLabel.setText(destinationDir.getFileName().toString());
+        }
+
         statusLabel.setText("File destination set to: " + destinationDir.getFileName());
     }
 
