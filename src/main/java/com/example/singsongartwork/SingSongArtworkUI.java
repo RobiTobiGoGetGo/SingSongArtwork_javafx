@@ -492,12 +492,35 @@ public class SingSongArtworkUI extends Application {
 
     private boolean showDirectoryPreview(Path directory) {
         try {
-            List<String> mp3Files = Files.list(directory)
-                    .filter(p -> !Files.isDirectory(p) && p.toString().toLowerCase().endsWith(".mp3"))
-                    .map(p -> p.getFileName().toString())
-                    .sorted()
-                    .limit(10)
-                    .toList();
+            // Verify directory exists and is accessible
+            if (directory == null || !Files.isDirectory(directory)) {
+                statusLabel.setText("Error: Invalid directory path");
+                return false;
+            }
+
+            // Get both MP3 and other files in one pass to avoid multiple stream issues
+            List<String> mp3Files = new ArrayList<>();
+            List<String> otherFiles = new ArrayList<>();
+
+            try (var stream = Files.list(directory)) {
+                stream.filter(p -> !Files.isDirectory(p))
+                      .forEach(p -> {
+                          String fileName = p.getFileName().toString();
+                          String lowerName = fileName.toLowerCase();
+                          if (lowerName.endsWith(".mp3")) {
+                              mp3Files.add(fileName);
+                          } else {
+                              otherFiles.add(fileName);
+                          }
+                      });
+            }
+
+            // Sort and limit
+            mp3Files.sort(String::compareTo);
+            mp3Files = mp3Files.stream().limit(10).toList();
+
+            otherFiles.sort(String::compareTo);
+            otherFiles = otherFiles.stream().limit(10).toList();
 
             // Show preview dialog for both empty and non-empty directories (consistent fail-safe approach)
             Dialog<ButtonType> previewDialog = new Dialog<>();
@@ -521,13 +544,6 @@ public class SingSongArtworkUI extends Application {
 
             if (mp3Files.isEmpty()) {
                 // Step 15: Check for other file types when no MP3 files are found
-                List<String> otherFiles = Files.list(directory)
-                        .filter(p -> !Files.isDirectory(p) && !p.toString().toLowerCase().endsWith(".mp3"))
-                        .map(p -> p.getFileName().toString())
-                        .sorted()
-                        .limit(10)
-                        .toList();
-
                 String emptyMessageText = "There are currently no MP3 files in this directory";
                 if (!otherFiles.isEmpty()) {
                     emptyMessageText += ", but there are other types of files there";
@@ -575,10 +591,10 @@ public class SingSongArtworkUI extends Application {
             // Set preferred size for dialog
             previewDialog.getDialogPane().setPrefWidth(700);
 
-
             return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
         } catch (Exception ex) {
             statusLabel.setText("Error reading directory: " + ex.getMessage());
+            ex.printStackTrace();
             return false;
         }
     }
