@@ -57,7 +57,7 @@ public class SingSongArtworkUI extends Application {
     private Label destLabel;
     private ProgressIndicator loadingIndicator;
     private Path currentDirectory;
-    private List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
+    private final List<TrackEntry> allTracksUnfiltered = new ArrayList<>();
     private TableColumn<TrackEntry, TrackEntry> artworkColumn;
     private TableColumn<TrackEntry, String> filenameColumn;
     private TableColumn<TrackEntry, String> titleColumn;
@@ -560,13 +560,13 @@ public class SingSongArtworkUI extends Application {
                     otherFilesLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
                     content.getChildren().add(otherFilesLabel);
 
-                    TextArea otherFilesList = new TextArea(String.join("\n", otherFiles));
-                    otherFilesList.setEditable(false);
-                    otherFilesList.setWrapText(false);
-                    otherFilesList.setPrefRowCount(8);
-                    otherFilesList.setPrefColumnCount(60);
-                    otherFilesList.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 12px;");
-                    content.getChildren().add(otherFilesList);
+                    TextArea otherFilesArea = new TextArea(String.join("\n", otherFiles));
+                    otherFilesArea.setEditable(false);
+                    otherFilesArea.setWrapText(false);
+                    otherFilesArea.setPrefRowCount(8);
+                    otherFilesArea.setPrefColumnCount(60);
+                    otherFilesArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 12px;");
+                    content.getChildren().add(otherFilesArea);
                 }
             } else {
                 // Info label with count
