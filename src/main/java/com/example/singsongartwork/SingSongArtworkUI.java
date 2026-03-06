@@ -1410,12 +1410,12 @@ public class SingSongArtworkUI extends Application {
         Path destinationDir = selected.toPath();
         saveLastCopyDestination(destinationDir);
 
-        // Update the destination label in the three-dot menu
+        // Update the destination label in the three-dot menu with full path
         if (destLabel != null) {
-            destLabel.setText(destinationDir.getFileName().toString());
+            destLabel.setText(destinationDir.toAbsolutePath().toString());
         }
 
-        statusLabel.setText("File destination set to: " + destinationDir.getFileName());
+        statusLabel.setText("File destination set to: " + destinationDir.toAbsolutePath().toString());
     }
 
     private void copyFilenameToClipboard() {
