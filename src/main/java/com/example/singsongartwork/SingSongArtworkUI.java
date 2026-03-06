@@ -520,10 +520,38 @@ public class SingSongArtworkUI extends Application {
             content.getChildren().add(dirPathLabel);
 
             if (mp3Files.isEmpty()) {
-                // Step 14: Show directory preview with consistent message for empty directories
-                Label emptyMessage = new Label("There are currently no MP3 files in this directory");
+                // Step 15: Check for other file types when no MP3 files are found
+                List<String> otherFiles = Files.list(directory)
+                        .filter(p -> !Files.isDirectory(p) && !p.toString().toLowerCase().endsWith(".mp3"))
+                        .map(p -> p.getFileName().toString())
+                        .sorted()
+                        .limit(10)
+                        .toList();
+
+                String emptyMessageText = "There are currently no MP3 files in this directory";
+                if (!otherFiles.isEmpty()) {
+                    emptyMessageText += ", but there are other types of files there";
+                }
+
+                Label emptyMessage = new Label(emptyMessageText);
                 emptyMessage.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ffffff;");
+                emptyMessage.setWrapText(true);
                 content.getChildren().add(emptyMessage);
+
+                // Show other file types if they exist
+                if (!otherFiles.isEmpty()) {
+                    Label otherFilesLabel = new Label("Other files found (" + otherFiles.size() + " shown):");
+                    otherFilesLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
+                    content.getChildren().add(otherFilesLabel);
+
+                    TextArea otherFilesList = new TextArea(String.join("\n", otherFiles));
+                    otherFilesList.setEditable(false);
+                    otherFilesList.setWrapText(false);
+                    otherFilesList.setPrefRowCount(8);
+                    otherFilesList.setPrefColumnCount(60);
+                    otherFilesList.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 12px;");
+                    content.getChildren().add(otherFilesList);
+                }
             } else {
                 // Info label with count
                 Label info = new Label("📁 MP3 files found (" + mp3Files.size() + " shown):");
