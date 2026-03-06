@@ -713,7 +713,7 @@ public class SingSongArtworkUI extends Application {
         titleColumn = new TableColumn<>("Title");
         titleColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
         titleColumn.setPrefWidth(260);
-        titleColumn.setSortable(true;
+        titleColumn.setSortable(true);
         titleColumn.setResizable(true);
 
         artistColumn = new TableColumn<>("Artist");
