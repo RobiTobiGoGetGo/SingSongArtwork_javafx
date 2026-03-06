@@ -84,10 +84,11 @@ public class SingSongArtworkUI extends Application {
     private final Set<Path> artworkLoadsInFlight = ConcurrentHashMap.newKeySet();
     private static final PseudoClass PLAYING_ROW_PSEUDO_CLASS = PseudoClass.getPseudoClass("playing");
 
-    // Mark/Unmark feature
-    private TableColumn<TrackEntry, Boolean> markColumn;
-    private final Set<Path> markedTrackPaths = ConcurrentHashMap.newKeySet();
-    private boolean showMarkedOnly = false;
+    // Choices feature
+    private TableColumn<TrackEntry, Boolean> choicesColumn;
+    private final Set<Path> choicesTrackPaths = ConcurrentHashMap.newKeySet();
+    private boolean showChoicesOnly = false;
+    private String retainedFilterText = ""; // Retained when "Show choices" is active
 
     @Override
     public void start(Stage primaryStage) {
@@ -116,7 +117,10 @@ public class SingSongArtworkUI extends Application {
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
         shortcutsItem.setStyle(menuItemStyle);
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
-        helpMenu.getItems().add(shortcutsItem);
+        // Only show shortcuts in Admin mode
+        if (adminMode) {
+            helpMenu.getItems().add(shortcutsItem);
+        }
 
         // Spacer to push three-dot menu to the right
         Region spacer = new Region();
@@ -143,11 +147,11 @@ public class SingSongArtworkUI extends Application {
 
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
 
-        MenuItem browseItem = new MenuItem("Browse Directory...");
+        MenuItem browseItem = new MenuItem("Choose file source...");
         browseItem.setStyle(menuItemStyle);
         browseItem.setOnAction(e -> openDirectoryChooser());
 
-        MenuItem reloadItem = new MenuItem("Reload Directory");
+        MenuItem reloadItem = new MenuItem("Reload files");
         reloadItem.setStyle(menuItemStyle);
         reloadItem.setOnAction(e -> {
             if (currentDirectory != null) {
@@ -157,21 +161,31 @@ public class SingSongArtworkUI extends Application {
 
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
 
-        CheckMenuItem showMarkedOnlyItem = new CheckMenuItem("Show Marked Only");
-        showMarkedOnlyItem.setStyle(menuItemStyle);
-        showMarkedOnlyItem.setSelected(showMarkedOnly);
-        showMarkedOnlyItem.setOnAction(e -> {
-            showMarkedOnly = showMarkedOnlyItem.isSelected();
+        CheckMenuItem showChoicesOnlyItem = new CheckMenuItem("Show choices");
+        showChoicesOnlyItem.setStyle(menuItemStyle);
+        showChoicesOnlyItem.setSelected(showChoicesOnly);
+        showChoicesOnlyItem.setOnAction(e -> {
+            showChoicesOnly = showChoicesOnlyItem.isSelected();
+            if (showChoicesOnly) {
+                // Save current filter text and disable filter
+                retainedFilterText = filterTextField.getText();
+                filterTextField.setText("");
+                filterTextField.setDisable(true);
+            } else {
+                // Re-enable filter and restore previous filter text
+                filterTextField.setDisable(false);
+                filterTextField.setText(retainedFilterText);
+            }
             applyFilter();
         });
 
-        MenuItem copyMarkedItem = new MenuItem("Copy Marked Files To...");
-        copyMarkedItem.setStyle(menuItemStyle);
-        copyMarkedItem.setOnAction(e -> copyMarkedTracksToDirectory());
+        MenuItem copyChoicesItem = new MenuItem("Copy choices to...");
+        copyChoicesItem.setStyle(menuItemStyle);
+        copyChoicesItem.setOnAction(e -> copyChoicesTracksToDirectory());
 
-        MenuItem clearMarkedItem = new MenuItem("Unmark All");
-        clearMarkedItem.setStyle(menuItemStyle);
-        clearMarkedItem.setOnAction(e -> clearMarkedTracks());
+        MenuItem clearChoicesItem = new MenuItem("Clear choices");
+        clearChoicesItem.setStyle(menuItemStyle);
+        clearChoicesItem.setOnAction(e -> clearChoicesTracks());
 
         SeparatorMenuItem separator3 = new SeparatorMenuItem();
 
@@ -229,19 +243,29 @@ public class SingSongArtworkUI extends Application {
         });
         roleMenu.getItems().addAll(userRoleItem, adminRoleItem);
 
+        // Admin-only menu items
+        MenuItem chooseDestinationItem = new MenuItem("Choose file destination...");
+        chooseDestinationItem.setStyle(menuItemStyle);
+        chooseDestinationItem.setOnAction(e -> chooseFileDestination());
+
         optionsMenu.getItems().addAll(
                 dirMenuItem,
                 separator1,
                 browseItem,
                 reloadItem,
                 separator2,
-                showMarkedOnlyItem,
-                copyMarkedItem,
-                clearMarkedItem,
-                separator3,
-                columnModeMenu,
-                roleMenu
+                showChoicesOnlyItem,
+                columnModeMenu
         );
+
+        // Add admin-only items
+        optionsMenu.getItems().add(separator3);
+        optionsMenu.getItems().add(copyChoicesItem);
+        optionsMenu.getItems().add(clearChoicesItem);
+        optionsMenu.getItems().add(new SeparatorMenuItem());
+        optionsMenu.getItems().add(chooseDestinationItem);
+        optionsMenu.getItems().add(new SeparatorMenuItem());
+        optionsMenu.getItems().add(roleMenu);
 
         titleBar.getChildren().addAll(titleLabel, helpMenu, spacer, optionsMenu);
 
@@ -420,13 +444,13 @@ public class SingSongArtworkUI extends Application {
             }
         });
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN), this::copyFilenameToClipboard);
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M), () -> setMarkedForSelected(true));
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M), () -> setChoicesForSelected(true));
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), () -> {
-            showMarkedOnly = !showMarkedOnly;
+            showChoicesOnly = !showChoicesOnly;
             applyFilter();
-            statusLabel.setText(showMarkedOnly ? "Showing marked only" : "Showing all tracks");
+            statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
         });
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), this::clearMarkedTracks);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), this::clearChoicesTracks);
     }
 
     private void openDirectoryChooser() {
@@ -631,9 +655,9 @@ public class SingSongArtworkUI extends Application {
         transportColumn.setSortable(false);
         transportColumn.setResizable(false);
 
-        markColumn = new TableColumn<>("Mark");
-        markColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(markedTrackPaths.contains(cellData.getValue().getFilePath())));
-        markColumn.setCellFactory(col -> new TableCell<>() {
+        choicesColumn = new TableColumn<>("Choices");
+        choicesColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(choicesTrackPaths.contains(cellData.getValue().getFilePath())));
+        choicesColumn.setCellFactory(col -> new TableCell<>() {
             private final CheckBox checkBox = new CheckBox();
 
             {
@@ -643,11 +667,11 @@ public class SingSongArtworkUI extends Application {
                         return;
                     }
                     if (checkBox.isSelected()) {
-                        markedTrackPaths.add(track.getFilePath());
+                        choicesTrackPaths.add(track.getFilePath());
                     } else {
-                        markedTrackPaths.remove(track.getFilePath());
+                        choicesTrackPaths.remove(track.getFilePath());
                     }
-                    if (showMarkedOnly) {
+                    if (showChoicesOnly) {
                         applyFilter();
                     }
                     updateSelectionStatus();
@@ -668,13 +692,13 @@ public class SingSongArtworkUI extends Application {
                 setGraphic(checkBox);
             }
         });
-        markColumn.setComparator((a, b) -> Boolean.compare(b, a)); // Sort marked (true) before unmarked (false)
-        markColumn.setPrefWidth(70);
-        markColumn.setSortable(true);
-        markColumn.setResizable(false);
+        choicesColumn.setComparator((a, b) -> Boolean.compare(b, a)); // Sort choices (true) before non-choices (false)
+        choicesColumn.setPrefWidth(70);
+        choicesColumn.setSortable(true);
+        choicesColumn.setResizable(false);
 
-        // Required order: mark, transport, artwork, filename, then optional metadata columns.
-        table.getColumns().add(markColumn);
+        // Required order: choices, transport, artwork, filename, then optional metadata columns.
+        table.getColumns().add(choicesColumn);
         table.getColumns().add(transportColumn);
         table.getColumns().add(artworkColumn);
         table.getColumns().add(filenameColumn);
@@ -1094,8 +1118,8 @@ public class SingSongArtworkUI extends Application {
         int selected = trackTable.getSelectionModel().getSelectedItems().size();
         int visible = trackTable.getItems() == null ? 0 : trackTable.getItems().size();
         int total = allTracksUnfiltered == null ? 0 : allTracksUnfiltered.size();
-        int marked = markedTrackPaths.size();
-        selectionLabel.setText("Selected: " + selected + " | Marked: " + marked + " | Visible: " + visible + " | Total: " + total);
+        int choices = choicesTrackPaths.size();
+        selectionLabel.setText("Selected: " + selected + " | Choices: " + choices + " | Visible: " + visible + " | Total: " + total);
     }
 
     private void clearFilter() {
@@ -1124,8 +1148,8 @@ public class SingSongArtworkUI extends Application {
 
         // Clear existing data
         allTracksUnfiltered.clear();
-        markedTrackPaths.clear();
-        showMarkedOnly = false;
+        choicesTrackPaths.clear();
+        showChoicesOnly = false;
         artworkBytesCache.clear();
         artworkLoadsInFlight.clear();
         trackTable.setItems(FXCollections.observableArrayList());
@@ -1205,11 +1229,11 @@ public class SingSongArtworkUI extends Application {
 
     private List<TrackEntry> applyActiveFilters(List<TrackEntry> source, String filterText) {
         List<TrackEntry> textFiltered = SearchFilter.filter(source, filterText);
-        if (!showMarkedOnly) {
+        if (!showChoicesOnly) {
             return textFiltered;
         }
         return textFiltered.stream()
-                .filter(track -> markedTrackPaths.contains(track.getFilePath()))
+                .filter(track -> choicesTrackPaths.contains(track.getFilePath()))
                 .toList();
     }
 
@@ -1229,75 +1253,81 @@ public class SingSongArtworkUI extends Application {
             contextMenu.getItems().add(replaceArtworkItem);
             contextMenu.getItems().add(batchEditItem);
             contextMenu.getItems().add(new SeparatorMenuItem());
+
+            MenuItem choicesSelectedItem = new MenuItem("Mark choices");
+            choicesSelectedItem.setStyle(contextMenuItemStyle);
+            choicesSelectedItem.setOnAction(e -> setChoicesForSelected(true));
+
+            MenuItem unchoicesSelectedItem = new MenuItem("Clear choices");
+            unchoicesSelectedItem.setStyle(contextMenuItemStyle);
+            unchoicesSelectedItem.setOnAction(e -> setChoicesForSelected(false));
+
+            MenuItem copyChoicesItem = new MenuItem("Copy choices to...");
+            copyChoicesItem.setStyle(contextMenuItemStyle);
+            copyChoicesItem.setOnAction(e -> copyChoicesTracksToDirectory());
+
+            MenuItem clearChoicesItem = new MenuItem("Clear all choices");
+            clearChoicesItem.setStyle(contextMenuItemStyle);
+            clearChoicesItem.setOnAction(e -> clearChoicesTracks());
+
+            MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
+            copyFilenameItem.setStyle(contextMenuItemStyle);
+            copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
+
+            contextMenu.getItems().add(choicesSelectedItem);
+            contextMenu.getItems().add(unchoicesSelectedItem);
+            contextMenu.getItems().add(copyChoicesItem);
+            contextMenu.getItems().add(clearChoicesItem);
+            contextMenu.getItems().add(new SeparatorMenuItem());
+            contextMenu.getItems().add(copyFilenameItem);
+        } else {
+            // User mode: only copy filename is available
+            MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
+            copyFilenameItem.setStyle(contextMenuItemStyle);
+            copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
+            contextMenu.getItems().add(copyFilenameItem);
         }
-
-        MenuItem markSelectedItem = new MenuItem("Mark Selected");
-        markSelectedItem.setStyle(contextMenuItemStyle);
-        markSelectedItem.setOnAction(e -> setMarkedForSelected(true));
-
-        MenuItem unmarkSelectedItem = new MenuItem("Unmark Selected");
-        unmarkSelectedItem.setStyle(contextMenuItemStyle);
-        unmarkSelectedItem.setOnAction(e -> setMarkedForSelected(false));
-
-        MenuItem copyMarkedItem = new MenuItem("Copy Marked Files To...");
-        copyMarkedItem.setStyle(contextMenuItemStyle);
-        copyMarkedItem.setOnAction(e -> copyMarkedTracksToDirectory());
-
-        MenuItem clearMarkedItem = new MenuItem("Unmark All");
-        clearMarkedItem.setStyle(contextMenuItemStyle);
-        clearMarkedItem.setOnAction(e -> clearMarkedTracks());
-
-        MenuItem copyFilenameItem = new MenuItem("Copy Filename(s)");
-        copyFilenameItem.setStyle(contextMenuItemStyle);
-        copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
-
-        contextMenu.getItems().add(markSelectedItem);
-        contextMenu.getItems().add(unmarkSelectedItem);
-        contextMenu.getItems().add(copyMarkedItem);
-        contextMenu.getItems().add(clearMarkedItem);
-        contextMenu.getItems().add(new SeparatorMenuItem());
-        contextMenu.getItems().add(copyFilenameItem);
 
         return contextMenu;
     }
 
-    private void setMarkedForSelected(boolean marked) {
+    private void setChoicesForSelected(boolean chosen) {
         ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
         if (selectedTracks == null || selectedTracks.isEmpty()) {
-            statusLabel.setText("No selected tracks to " + (marked ? "mark" : "unmark"));
+            statusLabel.setText("No selected tracks to " + (chosen ? "mark" : "clear"));
             return;
         }
 
         for (TrackEntry track : selectedTracks) {
-            if (marked) {
-                markedTrackPaths.add(track.getFilePath());
+            if (chosen) {
+                choicesTrackPaths.add(track.getFilePath());
             } else {
-                markedTrackPaths.remove(track.getFilePath());
+                choicesTrackPaths.remove(track.getFilePath());
             }
         }
 
-        if (showMarkedOnly) {
+        if (showChoicesOnly) {
             applyFilter();
         }
         trackTable.refresh();
         updateSelectionStatus();
-        statusLabel.setText((marked ? "Marked " : "Unmarked ") + selectedTracks.size() + " tracks");
+        statusLabel.setText((chosen ? "Marked " : "Unmarked ") + selectedTracks.size() + " tracks");
     }
 
-    private void clearMarkedTracks() {
-        int count = markedTrackPaths.size();
-        markedTrackPaths.clear();
+    private void clearChoicesTracks() {
+        int count = choicesTrackPaths.size();
+        choicesTrackPaths.clear();
         applyFilter();
         if (trackTable != null) {
             trackTable.refresh();
         }
         updateSelectionStatus();
-        statusLabel.setText("Unmarked " + count + " tracks");
+        statusLabel.setText("Cleared " + count + " choices");
     }
 
-    private void copyMarkedTracksToDirectory() {
-        if (markedTrackPaths.isEmpty()) {
-            statusLabel.setText("No marked tracks to copy");
+    private void copyChoicesTracksToDirectory() {
+        if (choicesTrackPaths.isEmpty()) {
+            statusLabel.setText("No choices to copy");
             return;
         }
 
@@ -1321,7 +1351,7 @@ public class SingSongArtworkUI extends Application {
         int successCount = 0;
         int failureCount = 0;
 
-        for (Path sourcePath : markedTrackPaths) {
+        for (Path sourcePath : choicesTrackPaths) {
             try {
                 Path targetPath = destinationDir.resolve(sourcePath.getFileName());
                 Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
@@ -1334,13 +1364,36 @@ public class SingSongArtworkUI extends Application {
         // Save the destination directory for next time
         saveLastCopyDestination(destinationDir);
 
-        statusLabel.setText("Copied marked files: " + successCount + " succeeded, " + failureCount + " failed");
+        statusLabel.setText("Copied choices: " + successCount + " succeeded, " + failureCount + " failed");
     }
 
     private void refreshContextMenuForRole() {
         if (trackTable != null) {
             trackTable.setContextMenu(createTableContextMenu());
         }
+    }
+
+    private void chooseFileDestination() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Choose File Destination Directory");
+
+        // Use last copy destination if available, otherwise fall back to current directory
+        Path lastCopyDest = getLastCopyDestination();
+        if (lastCopyDest != null && Files.isDirectory(lastCopyDest)) {
+            chooser.setInitialDirectory(lastCopyDest.toFile());
+        } else if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
+            chooser.setInitialDirectory(currentDirectory.toFile());
+        }
+
+        File selected = chooser.showDialog(null);
+        if (selected == null) {
+            statusLabel.setText("Destination selection cancelled");
+            return;
+        }
+
+        Path destinationDir = selected.toPath();
+        saveLastCopyDestination(destinationDir);
+        statusLabel.setText("File destination set to: " + destinationDir.getFileName());
     }
 
     private void copyFilenameToClipboard() {
