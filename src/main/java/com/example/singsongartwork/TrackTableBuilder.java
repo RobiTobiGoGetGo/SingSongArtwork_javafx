@@ -274,6 +274,13 @@ public class TrackTableBuilder {
     }
 
     /**
+     * Get artwork column.
+     */
+    public TableColumn<TrackEntry, TrackEntry> getArtworkColumn() {
+        return artworkColumn;
+    }
+
+    /**
      * Get filename column.
      */
     public TableColumn<TrackEntry, String> getFilenameColumn() {
@@ -293,5 +300,36 @@ public class TrackTableBuilder {
     public TableColumn<TrackEntry, String> getArtistColumn() {
         return artistColumn;
     }
-}
 
+    /**
+     * Get choices column.
+     */
+    public TableColumn<TrackEntry, Boolean> getChoicesColumn() {
+        return choicesColumn;
+    }
+
+    /**
+     * Get current column mode state.
+     */
+    public boolean isMoreColumnsMode() {
+        return moreColumnsMode;
+    }
+
+    /**
+     * Add a selection change listener (useful for UI state sync).
+     */
+    public void addSelectionListener(javafx.collections.ListChangeListener<TrackEntry> listener) {
+        if (table != null) {
+            table.getSelectionModel().getSelectedItems().addListener(listener);
+        }
+    }
+
+    /**
+     * Add an items change listener (useful for tracking data updates).
+     */
+    public void addItemsListener(javafx.beans.value.ChangeListener<ObservableList<TrackEntry>> listener) {
+        if (table != null) {
+            table.itemsProperty().addListener(listener);
+        }
+    }
+}

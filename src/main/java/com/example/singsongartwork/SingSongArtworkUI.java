@@ -102,6 +102,7 @@ public class SingSongArtworkUI extends Application {
     private MenuButton optionsMenu;
     private MenuButton helpMenu; // Class-level to allow dynamic updates
     private MenuBarBuilder menuBarBuilder;
+    private TrackTableBuilder tableBuilder;
     private FilterPanelBuilder filterPanelBuilder;
     private CheckMenuItem showChoicesOnlyMenuItem;
     private PlaybackBarBuilder playbackBarBuilder;
@@ -184,7 +185,25 @@ public class SingSongArtworkUI extends Application {
         root.setTop(topSection);
 
         // Center: table
-        trackTable = createTrackTable();
+        tableBuilder = new TrackTableBuilder(
+                this::getArtworkBytesForItem,
+                this::onTransportClicked,
+                ignored -> {
+                    if (showChoicesOnly) {
+                        applyFilter();
+                    }
+                    updateSelectionStatus();
+                },
+                this::isMediaPlaying,
+                choicesTrackPaths
+        );
+        trackTable = tableBuilder.buildTable();
+        tableBuilder.addSelectionListener((ListChangeListener<TrackEntry>) change -> updateSelectionStatus());
+        tableBuilder.addItemsListener((obs, oldItems, newItems) -> updateSelectionStatus());
+        configureTableRowFactory(trackTable);
+        configureArtworkDragAndDrop(trackTable);
+        ContextMenu contextMenu = createTableContextMenu();
+        tableBuilder.setContextMenu(contextMenu);
         root.setCenter(trackTable);
 
         // Bottom: playback bar + status
@@ -361,172 +380,19 @@ public class SingSongArtworkUI extends Application {
     }
 
     private TableView<TrackEntry> createTrackTable() {
-        TableView<TrackEntry> table = new TableView<>();
+        if (tableBuilder != null) {
+            // Table is already built by builder in start().
+            return trackTable;
+        }
 
-        // Enable multi-select
+        // Fallback if called without builder initialization.
+        TableView<TrackEntry> table = new TableView<>();
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        return table;
+    }
 
-        filenameColumn = new TableColumn<>("Filename");
-        filenameColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFilename()));
-        filenameColumn.setPrefWidth(320);
-        filenameColumn.setSortable(true);
-        filenameColumn.setResizable(true);
-
-        titleColumn = new TableColumn<>("Title");
-        titleColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
-        titleColumn.setPrefWidth(260);
-        titleColumn.setSortable(true);
-        titleColumn.setResizable(true);
-
-        artistColumn = new TableColumn<>("Artist");
-        artistColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getArtist()));
-        artistColumn.setPrefWidth(240);
-        artistColumn.setSortable(true);
-        artistColumn.setResizable(true);
-
-        artworkColumn = new TableColumn<>("Artwork");
-        artworkColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
-        artworkColumn.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(TrackEntry item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setGraphic(null);
-                    return;
-                }
-
-                if (!item.hasArtwork()) {
-                    setText("-");
-                    setGraphic(null);
-                    return;
-                }
-
-                byte[] artworkBytes = getArtworkBytesForItem(item);
-                if (artworkBytes.length == 0) {
-                    setText("-");
-                    setGraphic(null);
-                    triggerArtworkLazyLoad(item);
-                    return;
-                }
-
-                try {
-                    Image image = new Image(new ByteArrayInputStream(artworkBytes), 48, 48, true, true);
-                    if (image.isError()) {
-                        setText("-");
-                        setGraphic(null);
-                        return;
-                    }
-                    ImageView imageView = new ImageView(image);
-                    imageView.setFitWidth(48);
-                    imageView.setFitHeight(48);
-                    imageView.setPreserveRatio(true);
-                    setText(null);
-                    setGraphic(imageView);
-                } catch (Exception ex) {
-                    setText("-");
-                    setGraphic(null);
-                }
-            }
-        });
-        artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
-        artworkColumn.setPrefWidth(120);
-        artworkColumn.setSortable(true);
-        artworkColumn.setResizable(true);
-
-        transportColumn = new TableColumn<>("Play");
-        transportColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
-        transportColumn.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(TrackEntry item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setGraphic(null);
-                    return;
-                }
-
-                String symbol = "▶";
-                if (isCurrentTrack(item) && isMediaPlaying()) {
-                    symbol = "⏸";
-                }
-
-                Button button = new Button(symbol);
-                button.setFocusTraversable(false);
-                button.setStyle("-fx-padding: 4px 8px; -fx-font-size: 12px;");
-                button.setOnAction(e -> onTransportClicked(item));
-                setText(null);
-                setGraphic(button);
-            }
-        });
-        transportColumn.setPrefWidth(72);
-        transportColumn.setSortable(false);
-        transportColumn.setResizable(false);
-
-        choicesColumn = new TableColumn<>("Choices");
-        choicesColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(choicesTrackPaths.contains(cellData.getValue().getFilePath())));
-        choicesColumn.setCellFactory(col -> new TableCell<>() {
-            private final CheckBox checkBox = new CheckBox();
-
-            {
-                checkBox.setOnAction(e -> {
-                    TrackEntry track = getTableRow() == null ? null : (TrackEntry) getTableRow().getItem();
-                    if (track == null) {
-                        return;
-                    }
-                    if (checkBox.isSelected()) {
-                        choicesTrackPaths.add(track.getFilePath());
-                    } else {
-                        choicesTrackPaths.remove(track.getFilePath());
-                    }
-                    if (showChoicesOnly) {
-                        applyFilter();
-                    }
-                    updateSelectionStatus();
-                    if (trackTable != null) {
-                        trackTable.refresh();
-                    }
-                });
-            }
-
-            @Override
-            protected void updateItem(Boolean marked, boolean empty) {
-                super.updateItem(marked, empty);
-                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
-                    setGraphic(null);
-                    return;
-                }
-                checkBox.setSelected(Boolean.TRUE.equals(marked));
-                setGraphic(checkBox);
-            }
-        });
-        choicesColumn.setComparator((a, b) -> Boolean.compare(b, a)); // Sort choices (true) before non-choices (false)
-        choicesColumn.setPrefWidth(70);
-        choicesColumn.setSortable(true);
-        choicesColumn.setResizable(false);
-
-        // Required order: choices, transport, artwork, filename, then optional metadata columns.
-        table.getColumns().add(choicesColumn);
-        table.getColumns().add(transportColumn);
-        table.getColumns().add(artworkColumn);
-        table.getColumns().add(filenameColumn);
-        table.getColumns().add(titleColumn);
-        table.getColumns().add(artistColumn);
-
-        applyColumnMode();
-
-        // Add right-click context menu
-        ContextMenu contextMenu = createTableContextMenu();
-        table.setContextMenu(contextMenu);
-
-        // Keep bottom status bar in sync with selection/data changes.
-        table.getSelectionModel().getSelectedItems().addListener((ListChangeListener<TrackEntry>) change -> updateSelectionStatus());
-        table.itemsProperty().addListener((obs, oldItems, newItems) -> updateSelectionStatus());
-
-        // Enable drag-and-drop artwork replacement.
-        configureArtworkDragAndDrop(table);
-
+    private void configureTableRowFactory(TableView<TrackEntry> table) {
         table.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(TrackEntry item, boolean empty) {
@@ -559,313 +425,20 @@ public class SingSongArtworkUI extends Application {
                 }
             }
         });
-
-        return table;
-    }
-
-    private boolean isCurrentTrack(TrackEntry track) {
-        return track != null && playingTrackPath != null && playingTrackPath.equals(track.getFilePath());
-    }
-
-    private void onTransportClicked(TrackEntry track) {
-        if (track == null) {
-            return;
-        }
-
-        if (isCurrentTrack(track) && mediaPlayer != null) {
-            if (isMediaPlaying()) {
-                invokeMediaPlayerVoid("pause");
-            } else {
-                invokeMediaPlayerVoid("play");
-            }
-            updatePlaybackUi();
-            return;
-        }
-
-        startPlayback(track);
-    }
-
-    private void startPlayback(TrackEntry track) {
-        disposeMediaPlayer();
-        playingTrackPath = track.getFilePath();
-
-        try {
-            String mediaSource = toJavaFxMediaUri(playingTrackPath);
-            // Diagnostic output: keep URI visible in UI and console for troubleshooting path issues.
-            statusLabel.setText("Media URI: " + mediaSource);
-            System.out.println("[SingSongArtwork] Media URI: " + mediaSource);
-
-            mediaPlayer = createMediaPlayer(mediaSource);
-
-            invokeMediaPlayerVoid("setOnReady", (Runnable) () -> {
-                Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
-                if (playbackBarBuilder != null) {
-                    playbackBarBuilder.setMaxDuration(Math.max(total.toSeconds(), 0));
-                } else {
-                    playbackSlider.setMax(Math.max(total.toSeconds(), 0));
-                }
-                updatePlaybackUi();
-            });
-
-            Object currentTimeProperty = invokeMediaPlayer("currentTimeProperty");
-            if (currentTimeProperty instanceof javafx.beans.value.ObservableValue<?> observable) {
-                observable.addListener((obs, oldTime, newTime) -> {
-                    Duration current = safeToDuration(newTime);
-                    Duration total = safeToDuration(invokeMediaPlayer("getTotalDuration"));
-                    if (playbackBarBuilder != null) {
-                        playbackBarBuilder.updateSliderPosition(current.toSeconds());
-                        playbackBarBuilder.setTime(formatDuration(current), formatDuration(total));
-                    } else {
-                        if (!scrubbingPlayback) {
-                            playbackSlider.setValue(current.toSeconds());
-                        }
-                        playbackTimeLabel.setText(formatDuration(current) + " / " + formatDuration(total));
-                    }
-                });
-            }
-
-            invokeMediaPlayerVoid("setOnEndOfMedia", (Runnable) () -> {
-                invokeMediaPlayerVoid("stop");
-                updatePlaybackUi();
-            });
-
-            invokeMediaPlayerVoid("play");
-            if (playbackBarBuilder != null) {
-                playbackBarBuilder.setNowPlaying("Now Playing: " + track.getFilename());
-            } else {
-                nowPlayingLabel.setText("Now Playing: " + track.getFilename());
-            }
-            statusLabel.setText("Playing: " + track.getFilename() + " | URI: " + mediaSource);
-            updatePlaybackUi();
-        } catch (Exception ex) {
-            statusLabel.setText("Playback error for " + track.getFilename() + ": " + ex.getMessage());
-            disposeMediaPlayer();
-        }
-    }
-
-    private String toJavaFxMediaUri(Path path) {
-        Path absolute = path.toAbsolutePath().normalize();
-
-        // Use Path.toUri() which properly encodes special characters (spaces, umlauts, etc.)
-        URI fileUri = absolute.toUri();
-        String uriString = fileUri.toString();
-
-        // JavaFX Media rejects URIs with authority (file://host/share/...)
-        // UNC paths from Windows come as file://host/share/...
-        // We need to convert to file:////host/share/... (no authority)
-        if (uriString.startsWith("file://") && !uriString.startsWith("file:///")) {
-            // Has authority: file://host/...
-            // Remove "file://" and prepend "file:////" to make it authority-free
-            uriString = "file:////" + uriString.substring("file://".length());
-        }
-
-        return uriString;
-    }
-
-    private boolean isMediaPlaying() {
-        if (mediaPlayer == null) {
-            return false;
-        }
-        Object status = invokeMediaPlayer("getStatus");
-        return status != null && "PLAYING".equals(String.valueOf(status));
-    }
-
-    private Object createMediaPlayer(String mediaSource) {
-        try {
-            Class<?> mediaClass = Class.forName("javafx.scene.media.Media");
-            Object media = mediaClass.getConstructor(String.class).newInstance(mediaSource);
-            Class<?> mediaPlayerClass = Class.forName("javafx.scene.media.MediaPlayer");
-            return mediaPlayerClass.getConstructor(mediaClass).newInstance(media);
-        } catch (ClassNotFoundException ex) {
-            String msg = "JavaFX media module not found. The javafx.media module is not on the module path.";
-            System.err.println("[ERROR] " + msg);
-            System.err.println("Stack trace: " + ex);
-            throw new RuntimeException(msg, ex);
-        } catch (java.lang.reflect.InvocationTargetException ex) {
-            String msg = "JavaFX Media failed to initialize: " + ex.getCause();
-            System.err.println("[ERROR] " + msg);
-            System.err.println("Cause: " + ex.getCause());
-            throw new RuntimeException(msg, ex.getCause());
-        } catch (Exception ex) {
-            String msg = "JavaFX media module error: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
-            System.err.println("[ERROR] " + msg);
-            System.err.println("Stack trace: " + ex);
-            throw new RuntimeException(msg, ex);
-        }
-    }
-
-    private Object invokeMediaPlayer(String methodName, Object... args) {
-        if (mediaPlayer == null) {
-            return null;
-        }
-        try {
-            java.lang.reflect.Method method = findCompatibleMethod(mediaPlayer.getClass(), methodName, args);
-            if (method == null) {
-                return null;
-            }
-            return method.invoke(mediaPlayer, args);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private java.lang.reflect.Method findCompatibleMethod(Class<?> type, String methodName, Object[] args) {
-        for (java.lang.reflect.Method method : type.getMethods()) {
-            if (!method.getName().equals(methodName)) {
-                continue;
-            }
-            Class<?>[] paramTypes = method.getParameterTypes();
-            if (paramTypes.length != args.length) {
-                continue;
-            }
-            boolean matches = true;
-            for (int i = 0; i < paramTypes.length; i++) {
-                Object arg = args[i];
-                if (arg == null) {
-                    continue;
-                }
-                if (!paramTypes[i].isAssignableFrom(arg.getClass())) {
-                    matches = false;
-                    break;
-                }
-            }
-            if (matches) {
-                return method;
-            }
-        }
-        return null;
-    }
-
-    private void invokeMediaPlayerVoid(String methodName, Object... args) {
-        invokeMediaPlayer(methodName, args);
-    }
-
-    private Duration safeToDuration(Object value) {
-        if (value instanceof Duration d) {
-            return d;
-        }
-        return Duration.ZERO;
-    }
-
-    private void toggleGlobalPlayback() {
-        if (mediaPlayer == null) {
-            TrackEntry selected = trackTable.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                startPlayback(selected);
-            } else {
-                statusLabel.setText("Select a track to play.");
-            }
-            return;
-        }
-
-        if (isMediaPlaying()) {
-            invokeMediaPlayerVoid("pause");
-        } else {
-            invokeMediaPlayerVoid("play");
-        }
-        updatePlaybackUi();
-    }
-
-    private void stopPlayback() {
-        if (mediaPlayer != null) {
-            invokeMediaPlayerVoid("stop");
-            if (playbackBarBuilder != null) {
-                playbackBarBuilder.resetSlider();
-            } else {
-                playbackSlider.setValue(0);
-            }
-            updatePlaybackUi();
-        }
-    }
-
-    private void disposeMediaPlayer() {
-        if (mediaPlayer != null) {
-            try {
-                invokeMediaPlayerVoid("stop");
-                invokeMediaPlayerVoid("dispose");
-            } catch (Exception ignored) {
-                // Ignore dispose edge cases from platform media backends.
-            }
-            mediaPlayer = null;
-        }
-    }
-
-    private void updatePlaybackUi() {
-        if (playbackPlayPauseButton == null && playbackBarBuilder == null) {
-            return;
-        }
-
-        if (mediaPlayer == null) {
-            if (playbackBarBuilder != null) {
-                playbackBarBuilder.setPlayingState(false);
-                playbackBarBuilder.setStopEnabled(false);
-                playbackBarBuilder.setTime("00:00", "00:00");
-            } else {
-                playbackPlayPauseButton.setText("▶");
-                playbackStopButton.setDisable(true);
-                if (nowPlayingLabel != null && (nowPlayingLabel.getText() == null || nowPlayingLabel.getText().isBlank())) {
-                    nowPlayingLabel.setText("Now Playing: -");
-                }
-                if (playbackTimeLabel != null) {
-                    playbackTimeLabel.setText("00:00 / 00:00");
-                }
-            }
-        } else {
-            if (playbackBarBuilder != null) {
-                playbackBarBuilder.setPlayingState(isMediaPlaying());
-                playbackBarBuilder.setStopEnabled(true);
-            } else {
-                playbackPlayPauseButton.setText(isMediaPlaying() ? "⏸" : "▶");
-                playbackStopButton.setDisable(false);
-            }
-        }
-
-        if (trackTable != null) {
-            trackTable.refresh();
-        }
-    }
-
-    private String formatDuration(Duration duration) {
-        if (duration == null || duration.isUnknown() || duration.lessThanOrEqualTo(Duration.ZERO)) {
-            return "00:00";
-        }
-        int totalSeconds = (int) Math.floor(duration.toSeconds());
-        int minutes = totalSeconds / 60;
-        int seconds = totalSeconds % 60;
-        return String.format("%02d:%02d", minutes, seconds);
-    }
-
-    private HBox createPlaybackBar() {
-        playbackBarBuilder = new PlaybackBarBuilder(
-                this::toggleGlobalPlayback,
-                this::stopPlayback,
-                duration -> {
-                    if (mediaPlayer != null) {
-                        invokeMediaPlayerVoid("seek", duration);
-                    }
-                }
-        );
-
-        // Keep legacy fields assigned for compatibility with existing code paths.
-        HBox bar = playbackBarBuilder.buildBar();
-        playbackSlider = playbackBarBuilder.getSeekSlider();
-        return bar;
-    }
-
-    private VBox createBottomPanel() {
-        VBox bottom = new VBox();
-        bottom.getChildren().add(createPlaybackBar());
-        bottom.getChildren().add(createStatusBar());
-        return bottom;
     }
 
     private void applyColumnMode() {
-        if (filenameColumn == null || titleColumn == null || artistColumn == null || artworkColumn == null) {
-            return;
+        if (tableBuilder != null) {
+            tableBuilder.updateColumnMode(moreColumnsMode);
+        } else {
+            // Fallback: manual column mode application
+            if (filenameColumn == null || titleColumn == null || artistColumn == null || artworkColumn == null) {
+                return;
+            }
+            boolean showMore = moreColumnsMode;
+            titleColumn.setVisible(showMore);
+            artistColumn.setVisible(showMore);
         }
-        boolean showMore = moreColumnsMode;
-        titleColumn.setVisible(showMore);
-        artistColumn.setVisible(showMore);
     }
 
     private byte[] getArtworkBytesForItem(TrackEntry item) {
