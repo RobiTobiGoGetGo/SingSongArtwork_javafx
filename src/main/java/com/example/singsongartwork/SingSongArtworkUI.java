@@ -46,6 +46,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class SingSongArtworkUI extends Application {
     private Mp3MetadataService service;
@@ -80,6 +82,7 @@ public class SingSongArtworkUI extends Application {
     private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
     private static final String KEY_UI_ROLE = "ui.role";
     private static final String ADMIN_PASSWORD = "pwd";
+    private static final DateTimeFormatter LOG_TS_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // Phase 3: Artwork cache and in-flight tracking for lazy loading
     private final Map<Path, byte[]> artworkBytesCache = new ConcurrentHashMap<>();
@@ -97,6 +100,7 @@ public class SingSongArtworkUI extends Application {
     private Menu roleMenu;
     private MenuButton optionsMenu;
     private MenuButton helpMenu; // Class-level to allow dynamic updates
+    private final StringBuilder appLogBuffer = new StringBuilder();
 
     @Override
     public void start(Stage primaryStage) {
@@ -122,11 +126,17 @@ public class SingSongArtworkUI extends Application {
         helpMenu = new MenuButton("☰");
         helpMenu.setStyle(topIconStyle);
         helpMenu.getStyleClass().add("icon-menu-button");
+        MenuItem appLogItem = new MenuItem("Show app log...");
+        appLogItem.setStyle(menuItemStyle);
+        appLogItem.setOnAction(e -> showAppLogDialog());
+        helpMenu.getItems().add(appLogItem);
+
         MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
         shortcutsItem.setStyle(menuItemStyle);
         shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
         // Only show shortcuts in Admin mode
         if (adminMode) {
+            helpMenu.getItems().add(new SeparatorMenuItem());
             helpMenu.getItems().add(shortcutsItem);
         }
 
@@ -1343,6 +1353,7 @@ public class SingSongArtworkUI extends Application {
         }
         if (message != null && statusLabel != null) {
             statusLabel.setText(message);
+            appendAppLog(message);
         }
     }
 
@@ -1652,11 +1663,18 @@ public class SingSongArtworkUI extends Application {
     private void updateHelpMenuForRole() {
         if (helpMenu != null) {
             helpMenu.getItems().clear();
+
+            MenuItem appLogItem = new MenuItem("Show app log...");
+            appLogItem.setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
+            appLogItem.setOnAction(e -> showAppLogDialog());
+            helpMenu.getItems().add(appLogItem);
+
             if (adminMode) {
                 // Add shortcuts item in Admin mode
                 MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
                 shortcutsItem.setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
                 shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
+                helpMenu.getItems().add(new SeparatorMenuItem());
                 helpMenu.getItems().add(shortcutsItem);
             }
         }
@@ -2073,6 +2091,35 @@ public class SingSongArtworkUI extends Application {
             // Silently ignore
         }
         return props;
+    }
+
+    private void showAppLogDialog() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Application Log");
+        dialog.setHeaderText("SingSongArtwork - Runtime Log");
+
+        TextArea textArea = new TextArea();
+        textArea.setEditable(false);
+        textArea.setWrapText(false);
+        textArea.setPrefRowCount(24);
+        textArea.setPrefColumnCount(90);
+        textArea.setText(appLogBuffer.length() == 0 ? "No log entries yet." : appLogBuffer.toString());
+
+        dialog.getDialogPane().setContent(textArea);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    private void appendAppLog(String message) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        appLogBuffer
+            .append("[")
+            .append(LocalDateTime.now().format(LOG_TS_FORMAT))
+            .append("] ")
+            .append(message)
+            .append(System.lineSeparator());
     }
 
     public static void main(String[] args) {
