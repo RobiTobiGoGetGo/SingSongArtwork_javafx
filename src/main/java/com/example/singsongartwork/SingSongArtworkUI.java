@@ -35,7 +35,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1165,7 +1164,7 @@ public class SingSongArtworkUI extends Application {
         }
         int selected = trackTable.getSelectionModel().getSelectedItems().size();
         int visible = trackTable.getItems() == null ? 0 : trackTable.getItems().size();
-        int total = allTracksUnfiltered == null ? 0 : allTracksUnfiltered.size();
+        int total = allTracksUnfiltered.size();
         int choices = choicesTrackPaths.size();
         selectionLabel.setText("Selected: " + selected + " | Choices: " + choices + " | Visible: " + visible + " | Total: " + total);
     }
