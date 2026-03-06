@@ -453,6 +453,7 @@ public class SingSongArtworkUI extends Application {
         });
 
         String barButtonBaseStyle = "-fx-font-size: 13px; -fx-padding: 6px 10px; -fx-min-height: 34px; -fx-pref-height: 34px;";
+        String barIconButtonStyle = "-fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 0; -fx-min-width: 34px; -fx-pref-width: 34px; -fx-min-height: 34px; -fx-pref-height: 34px;";
 
         Button clearFilterBtn = new Button("Clear");
         clearFilterBtn.setStyle(barButtonBaseStyle);
@@ -464,7 +465,7 @@ public class SingSongArtworkUI extends Application {
 
         // Toggle for "Show choices" mode with Check icon
         Button showChoicesToggleBtn = new Button("☑");
-        showChoicesToggleBtn.setStyle(barButtonBaseStyle + " -fx-opacity: 0.6;");
+        showChoicesToggleBtn.setStyle(barIconButtonStyle + " -fx-opacity: 0.6;");
         showChoicesToggleBtn.setTooltip(new Tooltip("Toggle show choices only"));
         showChoicesToggleBtn.setOnAction(e -> {
             showChoicesOnly = !showChoicesOnly;
@@ -482,8 +483,8 @@ public class SingSongArtworkUI extends Application {
             statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
             // Keep active/inactive feedback while preserving shared button sizing.
             showChoicesToggleBtn.setStyle(showChoicesOnly
-                ? barButtonBaseStyle + " -fx-opacity: 1.0;"
-                : barButtonBaseStyle + " -fx-opacity: 0.6;");
+                ? barIconButtonStyle + " -fx-opacity: 1.0;"
+                : barIconButtonStyle + " -fx-opacity: 0.6;");
         });
 
         // Copy choices to copy directory button with CD icon
