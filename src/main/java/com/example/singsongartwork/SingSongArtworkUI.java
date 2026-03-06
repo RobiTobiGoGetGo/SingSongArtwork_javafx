@@ -84,11 +84,16 @@ public class SingSongArtworkUI extends Application {
     private final Set<Path> artworkLoadsInFlight = ConcurrentHashMap.newKeySet();
     private static final PseudoClass PLAYING_ROW_PSEUDO_CLASS = PseudoClass.getPseudoClass("playing");
 
-    // Choices feature
     private TableColumn<TrackEntry, Boolean> choicesColumn;
     private final Set<Path> choicesTrackPaths = ConcurrentHashMap.newKeySet();
     private boolean showChoicesOnly = false;
     private String retainedFilterText = ""; // Retained when "Show choices" is active
+
+    // Role menu items - made class-level for keyboard shortcut access
+    private RadioMenuItem userRoleItem;
+    private RadioMenuItem adminRoleItem;
+    private Menu roleMenu;
+    private MenuButton optionsMenu;
 
     @Override
     public void start(Stage primaryStage) {
@@ -127,7 +132,7 @@ public class SingSongArtworkUI extends Application {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Three-dot menu (⋮) on far right
-        MenuButton optionsMenu = new MenuButton("⋮");
+        optionsMenu = new MenuButton("⋮");
         optionsMenu.setStyle(topIconStyle);
         optionsMenu.getStyleClass().add("icon-menu-button");
 
@@ -238,13 +243,13 @@ public class SingSongArtworkUI extends Application {
         chooseDestinationItem.setOnAction(e -> chooseFileDestination());
 
         // Role toggle (default: User) - currently no behavioral effect.
-        Menu roleMenu = new Menu("Role");
+        roleMenu = new Menu("Role");
         roleMenu.setStyle(menuItemStyle);
         ToggleGroup roleGroup = new ToggleGroup();
 
         // Declare both RadioMenuItems first to avoid scope issues
-        RadioMenuItem userRoleItem = new RadioMenuItem("User");
-        RadioMenuItem adminRoleItem = new RadioMenuItem("Admin");
+        userRoleItem = new RadioMenuItem("User");
+        adminRoleItem = new RadioMenuItem("Admin");
 
         userRoleItem.setStyle(menuItemStyle);
         userRoleItem.setToggleGroup(roleGroup);
@@ -386,6 +391,9 @@ public class SingSongArtworkUI extends Application {
                 Context Menu:
                   Right-click         View options for selected tracks
                 
+                Admin & User Modes:
+                  Ctrl+Alt+A          Toggle Admin/User Role
+                
                 Drag & Drop:
                   Drag image onto selected tracks to replace artwork
                 """;
@@ -511,6 +519,21 @@ public class SingSongArtworkUI extends Application {
             statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
         });
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), this::clearChoicesTracks);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN, KeyCombination.ALT_DOWN), this::toggleAdminRole);
+    }
+
+    private void toggleAdminRole() {
+        if (adminMode) {
+            // Switch to User mode
+            if (userRoleItem != null) {
+                userRoleItem.fire();
+            }
+        } else {
+            // Switch to Admin mode
+            if (adminRoleItem != null) {
+                adminRoleItem.fire();
+            }
+        }
     }
 
     private void openDirectoryChooser() {
