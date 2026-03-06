@@ -79,6 +79,7 @@ public class SingSongArtworkUI extends Application {
     private static final String KEY_LAST_COPY_DIRECTORY = "last.copy.directory";
     private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
     private static final String KEY_UI_ROLE = "ui.role";
+    private static final String ADMIN_PASSWORD = "pwd";
 
     // Phase 3: Artwork cache and in-flight tracking for lazy loading
     private final Map<Path, byte[]> artworkBytesCache = new ConcurrentHashMap<>();
@@ -275,6 +276,15 @@ public class SingSongArtworkUI extends Application {
         adminRoleItem.setSelected(adminMode);
         adminRoleItem.setOnAction(e -> {
             if (!adminMode) { // Only update if actually switching from User to Admin
+                if (!promptForAdminPassword()) {
+                    // Revert selection when authentication fails or is canceled.
+                    userRoleItem.setSelected(true);
+                    adminRoleItem.setSelected(false);
+                    if (statusLabel != null) {
+                        statusLabel.setText("Admin mode access denied");
+                    }
+                    return;
+                }
                 adminMode = true;
                 adminRoleItem.setSelected(true);
                 userRoleItem.setSelected(false);
@@ -553,6 +563,28 @@ public class SingSongArtworkUI extends Application {
                 adminRoleItem.fire();
             }
         }
+    }
+
+    private boolean promptForAdminPassword() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Admin Authentication");
+        dialog.setHeaderText("Enter password to switch to Admin mode");
+
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Password");
+
+        VBox content = new VBox(8);
+        content.setPadding(new Insets(10));
+        content.getChildren().add(passwordField);
+        dialog.getDialogPane().setContent(content);
+
+        ButtonType okButton = new ButtonType("Unlock", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(okButton, ButtonType.CANCEL);
+
+        Platform.runLater(passwordField::requestFocus);
+
+        ButtonType result = dialog.showAndWait().orElse(ButtonType.CANCEL);
+        return result == okButton && ADMIN_PASSWORD.equals(passwordField.getText());
     }
 
     private void openDirectoryChooser() {
