@@ -30,6 +30,7 @@ public class MenuBarBuilder {
     private final Runnable onReloadMusicFiles;
     private final Runnable onChooseMusicDirectory;
     private final Runnable onChooseCopyDirectory;
+    private final Runnable onChooseArtworkDirectory;
     private final java.util.function.Consumer<Boolean> onToggleShowChoices;
     private final Runnable onCopyChoices;
     private final Runnable onClearChoices;
@@ -57,6 +58,7 @@ public class MenuBarBuilder {
         this.onReloadMusicFiles = onReloadMusicFiles;
         this.onChooseMusicDirectory = onChooseMusicDirectory;
         this.onChooseCopyDirectory = onChooseCopyDirectory;
+        this.onChooseArtworkDirectory = onChooseArtworkDirectory;
         this.onToggleShowChoices = onToggleShowChoices;
         this.onCopyChoices = onCopyChoices;
         this.onClearChoices = onClearChoices;
