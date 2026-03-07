@@ -1671,6 +1671,9 @@ public class SingSongArtworkUI extends Application {
             @Override
             protected void updateItem(TrackEntry item, boolean empty) {
                 super.updateItem(item, empty);
+                // Remove all cell padding
+                setStyle("-fx-padding: 0; -fx-alignment: CENTER;");
+
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
