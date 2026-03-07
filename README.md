@@ -15,6 +15,7 @@ A modern JavaFX application for managing MP3 metadata and artwork with an intuit
 ### User Interface
 - **Modern Dark Theme**: Professional dark UI with cyan accents
 - **Column Modes**: Toggle between "Less" (artwork + filename) and "More" (all columns)
+- **Artwork Size Toggle**: `Art+` button in filter bar toggles small/large artwork thumbnails
 - **User/Admin Roles**: Password-protected Admin mode unlocks advanced features
 - **Choice Selection**: Mark tracks for bulk operations (copy, batch edit)
 - **Directory Preview**: Preview MP3 files before loading
@@ -26,12 +27,16 @@ A modern JavaFX application for managing MP3 metadata and artwork with an intuit
 - **Default Filter Terms**: Pre-configured search terms loaded from `defaultFilterTerms.txt`
 - **Keyboard Shortcuts**: Comprehensive keyboard navigation (Admin mode)
 - **File Destination**: Set separate destination directory for copying chosen tracks
+- **Artwork Interactions**:
+  - Double-click **filename** cell to copy that filename
+  - Double-click **artwork** cell to preview full artwork (if available)
+  - In **Admin mode**, double-click missing artwork (`-`) to offer YouTube Music search (with confirmation)
 
 ## Requirements
 
 - **Java 17** or higher
 - **Maven 3.6+**
-- **JavaFX 17.0.2** (automatically managed by Maven)
+- **JavaFX 21.0.3** (managed by Maven)
 - **Windows** (primary platform; scripts included for easy launching)
 
 ## Quick Start
@@ -70,7 +75,7 @@ mvn javafx:run
 
 **Loading Music Files**
 - Three-dot menu → **Choose music directory...** → Select folder
-- Or: Automatically loads last-used directory on startup
+- App can reuse the last selected source directory
 
 **Filtering Tracks**
 - Type in the filter box to search across filename, title, and artist
@@ -89,7 +94,7 @@ mvn javafx:run
 
 **Admin Mode** (Password: `pwd`)
 - Three-dot menu → **Role** → **Admin**
-- Unlocks: Replace Artwork, Batch Edit, Keyboard Shortcuts, Advanced menus
+- Unlocks: Replace Artwork, Batch Edit, Keyboard Shortcuts, advanced operations
 
 **Replace Artwork** (Admin only)
 - Select one or more tracks
@@ -100,6 +105,15 @@ mvn javafx:run
 - Select multiple tracks
 - Right-click → **Batch Edit Metadata...**
 - Enter new title/artist (leave blank to keep existing)
+
+**Artwork Preview / Missing Artwork Search**
+- Double-click artwork cell to open full-size preview (if artwork exists)
+- In Admin mode, double-click missing artwork (`-`) to open a confirmation dialog for YouTube Music search
+- Search terms are built from filename (without `.mp3`) + artist
+
+**Filename Copy**
+- Double-click a **filename cell** to copy only that row's filename
+- `Ctrl+C` or context menu copies selected filename(s)
 
 **Mark and Copy Tracks**
 - Check boxes in **Choices** column to mark tracks
@@ -143,20 +157,14 @@ mvn clean install -DskipTests
 ```powershell
 mvn surefire-report:report
 ```
-Reports are generated in `target/surefire-reports/`
+Reports are generated in `target/surefire-reports/`.
 
 ### IntelliJ IDEA Configuration
-⚠️ **Important**: IntelliJ's Run button doesn't properly configure JavaFX modules.
-
-**Solution**: Use the provided scripts (`start-gui.bat`) or create a Maven run configuration:
-1. Run → Edit Configurations... → `+` → Maven
-2. Name: `SingSongArtwork [javafx:run]`
-3. Command line: `javafx:run`
-4. Click OK and Run
+If IntelliJ Run is not configured for JavaFX modules, prefer scripts or Maven run config.
 
 ## Project Structure
 
-```
+```text
 SingSongArtwork/
 ├── src/main/java/com/example/singsongartwork/
 │   ├── SingSongArtworkUI.java         # Main JavaFX GUI application
@@ -164,11 +172,17 @@ SingSongArtwork/
 │   ├── Mp3MetadataService.java        # MP3 metadata reading/writing
 │   ├── TrackEntry.java                # Data model for MP3 tracks
 │   ├── SearchFilter.java              # Multi-word search logic
-│   └── SortField.java                 # Sorting field enum
+│   ├── SortField.java                 # Sorting field enum
+│   ├── ConfigurationManager.java      # Config persistence abstraction
+│   ├── DialogFactory.java             # Centralized dialog creation
+│   ├── FilterPanelBuilder.java        # Filter/top-bar UI builder
+│   ├── TrackTableBuilder.java         # Table/column builder
+│   ├── MenuBarBuilder.java            # Help/options menu builder
+│   └── PlaybackBarBuilder.java        # Playback controls builder
 ├── src/main/resources/
 │   ├── defaultFilterTerms.txt         # Pre-configured filter terms
 │   └── styles/modern-dark.css         # Dark theme stylesheet
-├── src/test/java/                     # Comprehensive unit tests
+├── src/test/java/                     # Unit/integration tests
 ├── pom.xml                            # Maven project configuration
 ├── start-gui.bat                      # Windows launcher (recommended)
 ├── start-gui.ps1                      # PowerShell launcher
@@ -177,18 +191,19 @@ SingSongArtwork/
 
 ## Dependencies
 
-- **JavaFX 17.0.2**: UI framework (controls, media)
+- **JavaFX 21.0.3**: UI framework (`javafx-controls`, `javafx-fxml`, `javafx-media`)
 - **JAudioTagger 3.0.1**: MP3 metadata reading/writing
-- **JUnit 5.10.0**: Testing framework
-- **Maven Compiler Plugin**: Java 17 compilation
-- **JavaFX Maven Plugin**: JavaFX application execution
+- **JUnit Jupiter 5.11.3**: Testing framework
+- **Maven Compiler Plugin 3.13.0**: Java 17 compilation
+- **Maven Surefire Plugin 3.5.1**: Test execution
+- **JavaFX Maven Plugin 0.0.8**: JavaFX app execution
 
 ## Troubleshooting
 
 ### Application Won't Start
 - Ensure Java 17+ is installed: `java -version`
 - Rebuild: `mvn clean install`
-- Use the provided scripts instead of IDE Run button
+- Use the provided scripts instead of IDE Run button when needed
 
 ### Playback Issues
 - Ensure MP3 files are valid and not corrupted
@@ -196,17 +211,18 @@ SingSongArtwork/
 - UNC network paths may require special URI encoding (handled automatically)
 
 ### Artwork Not Displaying
-- Artwork loads lazily on-demand (scroll to trigger loading)
+- Artwork loads lazily on-demand (first render may show `-` briefly)
 - Check file permissions on MP3 files
 - Some MP3s may not have embedded artwork (shows `-`)
+
+### Missing Artwork Search Not Triggering
+- Feature is **Admin mode only**
+- Double-click directly on the artwork cell showing `-`
+- Confirm dialog must be accepted before browser opens
 
 ### Admin Mode Not Working
 - Password is: `pwd`
 - Role always resets to User mode on restart (fail-safe)
-
-### Changes Not Saved
-- Application must have write permissions to MP3 directory
-- Configuration saved to `~/.singsongartwork/config.properties`
 
 ## License
 
@@ -215,6 +231,3 @@ See [LICENSE.md](LICENSE.md) for details.
 ## Version History
 
 - **v1.0** - Initial release with modern UI, playback, and advanced features
-- Core MP3 metadata management
-- Dark theme with role-based access control
-- Comprehensive keyboard shortcuts and batch operations
