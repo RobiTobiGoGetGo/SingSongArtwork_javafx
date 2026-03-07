@@ -156,7 +156,7 @@ public class TrackTableBuilder {
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty ? null : item);
-                setStyle("-fx-alignment: CENTER_LEFT;");
+                setStyle("-fx-alignment: CENTER_LEFT; -fx-padding: 0 0 0 4px;");
             }
         });
         filenameColumn.setPrefWidth(240);

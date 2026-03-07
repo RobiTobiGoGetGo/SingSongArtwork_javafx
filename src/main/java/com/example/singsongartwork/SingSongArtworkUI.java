@@ -320,6 +320,63 @@ public class SingSongArtworkUI extends Application {
         DialogFactory.showArtworkCard(track.getFilename(), bytes);
     }
 
+    private void searchYouTubeMusicForTrack(TrackEntry track) {
+        if (track == null) {
+            return;
+        }
+
+        // Build search query from filename and artist
+        String filename = track.getFilename();
+        String artist = track.getArtist();
+
+        // Remove file extension from filename
+        if (filename != null && filename.toLowerCase().endsWith(".mp3")) {
+            filename = filename.substring(0, filename.length() - 4);
+        }
+
+        // Combine filename and artist for search
+        StringBuilder searchQuery = new StringBuilder();
+        if (filename != null && !filename.isBlank()) {
+            searchQuery.append(filename);
+        }
+        if (artist != null && !artist.isBlank()) {
+            if (searchQuery.length() > 0) {
+                searchQuery.append(" ");
+            }
+            searchQuery.append(artist);
+        }
+
+        if (searchQuery.length() == 0) {
+            if (statusLabel != null) {
+                statusLabel.setText("Cannot search: no filename or artist available");
+            }
+            return;
+        }
+
+        try {
+            // URL encode the search query
+            String encodedQuery = java.net.URLEncoder.encode(searchQuery.toString(), "UTF-8");
+            String youtubeUrl = "https://music.youtube.com/search?q=" + encodedQuery;
+
+            // Open in default browser
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(new URI(youtubeUrl));
+                if (statusLabel != null) {
+                    statusLabel.setText("Opened YouTube Music search for: " + searchQuery);
+                }
+            } else {
+                if (statusLabel != null) {
+                    statusLabel.setText("Error: Cannot open browser");
+                }
+            }
+        } catch (Exception ex) {
+            if (statusLabel != null) {
+                statusLabel.setText("Error opening YouTube Music: " + ex.getMessage());
+            }
+            System.err.println("[ERROR] Failed to open YouTube Music: " + ex.getMessage());
+        }
+    }
+
     private void configureFilenameDoubleClick() {
         if (tableBuilder == null || tableBuilder.getFilenameColumn() == null) {
             return;
@@ -1722,7 +1779,13 @@ public class SingSongArtworkUI extends Application {
                     if (event.getClickCount() == 2 && !isEmpty()) {
                         TrackEntry rowItem = getItem();
                         if (rowItem != null) {
-                            showFullArtworkForTrack(rowItem);
+                            // If artwork is missing and in Admin mode, search YouTube Music
+                            if (!rowItem.hasArtwork() && adminMode) {
+                                searchYouTubeMusicForTrack(rowItem);
+                            } else if (rowItem.hasArtwork()) {
+                                // Show full artwork if it exists
+                                showFullArtworkForTrack(rowItem);
+                            }
                             event.consume();
                         }
                     }
