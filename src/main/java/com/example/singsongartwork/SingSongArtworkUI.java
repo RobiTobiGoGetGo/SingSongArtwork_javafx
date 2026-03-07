@@ -135,7 +135,6 @@ public class SingSongArtworkUI extends Application {
                 () -> showMarkdownFile("README.md", "README"),
                 () -> showMarkdownFile("LICENSE.md", "LICENSE"),
                 this::showKeyboardShortcuts,
-                this::openDirectoryChooser,
                 () -> {
                     if (currentDirectory != null) {
                         if (showDirectoryPreview(currentDirectory)) {

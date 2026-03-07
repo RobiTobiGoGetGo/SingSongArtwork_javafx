@@ -26,7 +26,6 @@ public class MenuBarBuilder {
     private final Runnable onShowReadme;
     private final Runnable onShowLicense;
     private final Runnable onShowShortcuts;
-    private final Runnable onOpenMusicDirectory;
     private final Runnable onReloadMusicFiles;
     private final Runnable onChooseMusicDirectory;
     private final Runnable onChooseCopyDirectory;
@@ -41,7 +40,6 @@ public class MenuBarBuilder {
             Runnable onShowReadme,
             Runnable onShowLicense,
             Runnable onShowShortcuts,
-            Runnable onOpenMusicDirectory,
             Runnable onReloadMusicFiles,
             Runnable onChooseMusicDirectory,
             Runnable onChooseCopyDirectory,
@@ -54,7 +52,6 @@ public class MenuBarBuilder {
         this.onShowReadme = onShowReadme;
         this.onShowLicense = onShowLicense;
         this.onShowShortcuts = onShowShortcuts;
-        this.onOpenMusicDirectory = onOpenMusicDirectory;
         this.onReloadMusicFiles = onReloadMusicFiles;
         this.onChooseMusicDirectory = onChooseMusicDirectory;
         this.onChooseCopyDirectory = onChooseCopyDirectory;
