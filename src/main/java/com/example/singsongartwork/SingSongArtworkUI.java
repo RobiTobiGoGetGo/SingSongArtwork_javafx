@@ -860,34 +860,11 @@ public class SingSongArtworkUI extends Application {
             artworkActionsItem.setStyle(contextMenuItemStyle);
             artworkActionsItem.setOnAction(e -> openArtworkActionsForSelectedTrack());
 
-            contextMenu.getItems().add(artworkActionsItem);
-            contextMenu.getItems().add(new SeparatorMenuItem());
-
-            MenuItem choicesSelectedItem = new MenuItem("Mark choices");
-            choicesSelectedItem.setStyle(contextMenuItemStyle);
-            choicesSelectedItem.setOnAction(e -> setChoicesForSelected(true));
-
-            MenuItem unchoicesSelectedItem = new MenuItem("Clear choices");
-            unchoicesSelectedItem.setStyle(contextMenuItemStyle);
-            unchoicesSelectedItem.setOnAction(e -> setChoicesForSelected(false));
-
-            MenuItem copyChoicesItem = new MenuItem("Copy choices to...");
-            copyChoicesItem.setStyle(contextMenuItemStyle);
-            copyChoicesItem.setOnAction(e -> copyChoicesTracksToCopyDirectory());
-
-            MenuItem clearChoicesItem = new MenuItem("Clear all choices");
-            clearChoicesItem.setStyle(contextMenuItemStyle);
-            clearChoicesItem.setOnAction(e -> clearChoicesTracks());
-
             MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
             copyFilenameItem.setStyle(contextMenuItemStyle);
             copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
 
-            contextMenu.getItems().add(choicesSelectedItem);
-            contextMenu.getItems().add(unchoicesSelectedItem);
-            contextMenu.getItems().add(copyChoicesItem);
-            contextMenu.getItems().add(clearChoicesItem);
-            contextMenu.getItems().add(new SeparatorMenuItem());
+            contextMenu.getItems().add(artworkActionsItem);
             contextMenu.getItems().add(copyFilenameItem);
         } else {
             // User mode: only copy filename is available
