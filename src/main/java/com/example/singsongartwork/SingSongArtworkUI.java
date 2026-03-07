@@ -146,6 +146,7 @@ public class SingSongArtworkUI extends Application {
                 },
                 this::openDirectoryChooser,
                 this::chooseCopyDirectory,
+                this::chooseArtworkDirectory,
                 selected -> {
                     if (filterPanelBuilder != null) {
                         filterPanelBuilder.setShowChoicesOnly(selected);
@@ -245,6 +246,9 @@ public class SingSongArtworkUI extends Application {
 
         // Initialize copyDirectoryLabel with the last used copy directory path (but don't load it)
         initializeLastCopyDirectory();
+
+        // Initialize artwork directory label with the last used artwork directory path
+        initializeLastArtworkDirectory();
 
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
@@ -1125,15 +1129,41 @@ public class SingSongArtworkUI extends Application {
         Path copyDirectory = selected.toPath();
         saveLastCopyDirectory(copyDirectory);
 
-        // Update the copy directory label in the three-dot menu with full path
+        // Update the copy directory in the three-dot menu
         if (menuBarBuilder != null) {
             menuBarBuilder.setCopyDirectory(copyDirectory.toAbsolutePath().toString());
         }
-        if (copyDirectoryLabel != null) {
-            copyDirectoryLabel.setText(copyDirectory.toAbsolutePath().toString());
-        }
 
         statusLabel.setText("Copy directory set to: " + copyDirectory.toAbsolutePath());
+    }
+
+    private void chooseArtworkDirectory() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle("Choose artwork directory");
+
+        // Use last artwork directory if available
+        Path lastArtworkDir = getLastArtworkDirectory();
+        if (lastArtworkDir != null && Files.isDirectory(lastArtworkDir)) {
+            chooser.setInitialDirectory(lastArtworkDir.toFile());
+        } else if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
+            chooser.setInitialDirectory(currentDirectory.toFile());
+        }
+
+        File selected = chooser.showDialog(null);
+        if (selected == null) {
+            statusLabel.setText("Artwork directory selection cancelled");
+            return;
+        }
+
+        Path artworkDirectory = selected.toPath();
+        saveLastArtworkDirectory(artworkDirectory);
+
+        // Update the artwork directory in the three-dot menu
+        if (menuBarBuilder != null) {
+            menuBarBuilder.setArtworkDirectory(artworkDirectory.toAbsolutePath().toString());
+        }
+
+        statusLabel.setText("Artwork directory set to: " + artworkDirectory.toAbsolutePath());
     }
 
     private void copyFilenameToClipboard() {
@@ -1327,6 +1357,18 @@ public class SingSongArtworkUI extends Application {
         if (lastPath != null && Files.isDirectory(lastPath)) {
             if (menuBarBuilder != null) {
                 menuBarBuilder.setCopyDirectory(lastPath.toAbsolutePath().toString());
+            }
+            if (copyDirectoryLabel != null) {
+                copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());
+            }
+        }
+    }
+
+    private void initializeLastArtworkDirectory() {
+        Path lastPath = configManager.getLastArtworkDirectory();
+        if (lastPath != null && Files.isDirectory(lastPath)) {
+            if (menuBarBuilder != null) {
+                menuBarBuilder.setArtworkDirectory(lastPath.toAbsolutePath().toString());
             }
             if (copyDirectoryLabel != null) {
                 copyDirectoryLabel.setText(lastPath.toAbsolutePath().toString());

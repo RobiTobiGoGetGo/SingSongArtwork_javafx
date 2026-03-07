@@ -18,8 +18,9 @@ public class MenuBarBuilder {
     private RadioMenuItem userRoleItem;
     private RadioMenuItem adminRoleItem;
     private Menu roleMenu;
-    private Label musicDirectoryLabel;
-    private Label copyDirectoryLabel;
+    private MenuItem musicDirectoryMenuItem;
+    private MenuItem copyDirectoryMenuItem;
+    private MenuItem artworkDirectoryMenuItem;
 
     // Event handlers
     private final Runnable onShowAppLog;
@@ -43,6 +44,7 @@ public class MenuBarBuilder {
             Runnable onReloadMusicFiles,
             Runnable onChooseMusicDirectory,
             Runnable onChooseCopyDirectory,
+            Runnable onChooseArtworkDirectory,
             java.util.function.Consumer<Boolean> onToggleShowChoices,
             Runnable onCopyChoices,
             Runnable onClearChoices,
@@ -99,13 +101,24 @@ public class MenuBarBuilder {
         menu.setStyle(topIconStyle);
         menu.getStyleClass().add("icon-menu-button");
 
-        // Music directory info
-        CustomMenuItem musicDirectoryMenuItem = createMusicDirectoryItem();
+        // Directory menu items at top (always visible, clickable only in Admin mode)
+        musicDirectoryMenuItem = new MenuItem("Music: Not set");
+        musicDirectoryMenuItem.setStyle(menuItemStyle);
+        musicDirectoryMenuItem.setDisable(true); // Will be enabled in Admin mode
+        musicDirectoryMenuItem.setOnAction(e -> onChooseMusicDirectory.run());
         menu.getItems().add(musicDirectoryMenuItem);
 
-        // Copy directory info
-        CustomMenuItem copyDirectoryMenuItem = createCopyDirectoryItem();
+        copyDirectoryMenuItem = new MenuItem("Copy: Not set");
+        copyDirectoryMenuItem.setStyle(menuItemStyle);
+        copyDirectoryMenuItem.setDisable(true); // Will be enabled in Admin mode
+        copyDirectoryMenuItem.setOnAction(e -> onChooseCopyDirectory.run());
         menu.getItems().add(copyDirectoryMenuItem);
+
+        artworkDirectoryMenuItem = new MenuItem("Artwork: Not set");
+        artworkDirectoryMenuItem.setStyle(menuItemStyle);
+        artworkDirectoryMenuItem.setDisable(true); // Will be enabled in Admin mode
+        artworkDirectoryMenuItem.setOnAction(e -> onChooseArtworkDirectory.run());
+        menu.getItems().add(artworkDirectoryMenuItem);
 
         menu.getItems().add(new SeparatorMenuItem());
 
@@ -130,43 +143,6 @@ public class MenuBarBuilder {
         return menu;
     }
 
-    private CustomMenuItem createMusicDirectoryItem() {
-        CustomMenuItem item = new CustomMenuItem();
-        VBox info = new VBox(3);
-        info.setPadding(new Insets(6, 12, 6, 12));
-
-        Label titleLabel = new Label("Music directory:");
-        titleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-
-        musicDirectoryLabel = new Label("No directory selected");
-        musicDirectoryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
-        musicDirectoryLabel.setWrapText(true);
-        musicDirectoryLabel.setMaxWidth(300);
-
-        info.getChildren().addAll(titleLabel, musicDirectoryLabel);
-        item.setContent(info);
-        item.setHideOnClick(false);
-        return item;
-    }
-
-    private CustomMenuItem createCopyDirectoryItem() {
-        CustomMenuItem item = new CustomMenuItem();
-        VBox info = new VBox(3);
-        info.setPadding(new Insets(6, 12, 6, 12));
-
-        Label titleLabel = new Label("File destination:");
-        titleLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: #b3b3b3; -fx-font-weight: 600;");
-
-        copyDirectoryLabel = new Label("Not set");
-        copyDirectoryLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffffff;");
-        copyDirectoryLabel.setWrapText(true);
-        copyDirectoryLabel.setMaxWidth(300);
-
-        info.getChildren().addAll(titleLabel, copyDirectoryLabel);
-        item.setContent(info);
-        item.setHideOnClick(false);
-        return item;
-    }
 
     private Menu createColumnModeMenu() {
         Menu menu = new Menu("Column Mode");
@@ -256,13 +232,24 @@ public class MenuBarBuilder {
 
         optionsMenu.getItems().clear();
 
-        // Music directory
-        CustomMenuItem musicDirectoryMenuItem = createMusicDirectoryItem();
+        // Directory menu items at top
+        musicDirectoryMenuItem = new MenuItem("Music: Not set");
+        musicDirectoryMenuItem.setStyle(menuItemStyle);
+        musicDirectoryMenuItem.setDisable(!isAdmin); // Enabled only in Admin mode
+        musicDirectoryMenuItem.setOnAction(e -> onChooseMusicDirectory.run());
         optionsMenu.getItems().add(musicDirectoryMenuItem);
 
-        // Copy directory
-        CustomMenuItem copyDirectoryMenuItem = createCopyDirectoryItem();
+        copyDirectoryMenuItem = new MenuItem("Copy: Not set");
+        copyDirectoryMenuItem.setStyle(menuItemStyle);
+        copyDirectoryMenuItem.setDisable(!isAdmin); // Enabled only in Admin mode
+        copyDirectoryMenuItem.setOnAction(e -> onChooseCopyDirectory.run());
         optionsMenu.getItems().add(copyDirectoryMenuItem);
+
+        artworkDirectoryMenuItem = new MenuItem("Artwork: Not set");
+        artworkDirectoryMenuItem.setStyle(menuItemStyle);
+        artworkDirectoryMenuItem.setDisable(!isAdmin); // Enabled only in Admin mode
+        artworkDirectoryMenuItem.setOnAction(e -> onChooseArtworkDirectory.run());
+        optionsMenu.getItems().add(artworkDirectoryMenuItem);
 
         optionsMenu.getItems().add(new SeparatorMenuItem());
 
@@ -283,18 +270,6 @@ public class MenuBarBuilder {
 
         // Admin-only items
         if (isAdmin) {
-            optionsMenu.getItems().add(new SeparatorMenuItem());
-
-            MenuItem chooseMusicDirItem = new MenuItem("Choose music directory...");
-            chooseMusicDirItem.setStyle(menuItemStyle);
-            chooseMusicDirItem.setOnAction(e -> onChooseMusicDirectory.run());
-            optionsMenu.getItems().add(chooseMusicDirItem);
-
-            MenuItem chooseCopyDirItem = new MenuItem("Choose file destination...");
-            chooseCopyDirItem.setStyle(menuItemStyle);
-            chooseCopyDirItem.setOnAction(e -> onChooseCopyDirectory.run());
-            optionsMenu.getItems().add(chooseCopyDirItem);
-
             optionsMenu.getItems().add(new SeparatorMenuItem());
 
             CheckMenuItem showChoicesItem = new CheckMenuItem("Show choices");
@@ -318,8 +293,8 @@ public class MenuBarBuilder {
      * Update music directory label.
      */
     public void setMusicDirectory(String path) {
-        if (musicDirectoryLabel != null) {
-            musicDirectoryLabel.setText(path);
+        if (musicDirectoryMenuItem != null) {
+            musicDirectoryMenuItem.setText("Music: " + (path == null || path.isEmpty() ? "Not set" : path));
         }
     }
 
@@ -327,8 +302,17 @@ public class MenuBarBuilder {
      * Update copy directory label.
      */
     public void setCopyDirectory(String path) {
-        if (copyDirectoryLabel != null) {
-            copyDirectoryLabel.setText(path);
+        if (copyDirectoryMenuItem != null) {
+            copyDirectoryMenuItem.setText("Copy: " + (path == null || path.isEmpty() ? "Not set" : path));
+        }
+    }
+
+    /**
+     * Update artwork directory label.
+     */
+    public void setArtworkDirectory(String path) {
+        if (artworkDirectoryMenuItem != null) {
+            artworkDirectoryMenuItem.setText("Artwork: " + (path == null || path.isEmpty() ? "Not set" : path));
         }
     }
 

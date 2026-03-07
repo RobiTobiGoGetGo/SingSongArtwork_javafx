@@ -1,0 +1,9 @@
+Step 36 errors:
+1. Constructor expects 12 params, we're passing 13 - need to remove the extra this::chooseArtworkDirectory call
+2. Line 160 compares Boolean to int (mode == 1)
+
+The extra parameter issue is because chooser params are:
+- onChooseMusicDirectory
+- onChooseCopyDirectory
+- onChooseArtworkDirectory (we added this)
+But maybe constructor only expects 2 chooser handlers total?
