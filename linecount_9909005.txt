@@ -1,6 +1,0 @@
-
-Lines Words Characters Property
------ ----- ---------- --------
- 1501                          
-
-

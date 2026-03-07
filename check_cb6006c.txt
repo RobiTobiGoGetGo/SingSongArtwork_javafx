@@ -1,7 +1,0 @@
-
-    private void clearChoicesTracks() {
-    private void copyChoicesTracksToCopyDirectory() {
-    private void chooseCopyDirectory() {
-    private void copyFilenameToClipboard() {
-
-
