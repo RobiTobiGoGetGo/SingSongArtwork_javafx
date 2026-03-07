@@ -328,7 +328,7 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        tableBuilder.getFilenameColumn().setCellFactory(col -> new TableCell<>() {
+        tableBuilder.getFilenameColumn().setCellFactory(col -> new TableCell<String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -337,8 +337,9 @@ public class SingSongArtworkUI extends Application {
             }
 
             {
+                // Handle double-click on filename cell
                 setOnMouseClicked(event -> {
-                    if (event.getClickCount() == 2 && event.isPrimaryButtonDown() && !isEmpty()) {
+                    if (event.getClickCount() == 2 && !isEmpty()) {
                         TrackEntry rowTrack = getTableRow() == null ? null : (TrackEntry) getTableRow().getItem();
                         if (rowTrack != null) {
                             ClipboardContent content = new ClipboardContent();
@@ -1663,7 +1664,7 @@ public class SingSongArtworkUI extends Application {
         // Create new artwork column with proper caching and lazy-loading
         artworkColumn = new TableColumn<>("Artwork");
         artworkColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
-        artworkColumn.setCellFactory(col -> new TableCell<>() {
+        artworkColumn.setCellFactory(col -> new TableCell<TrackEntry, TrackEntry>() {
             @Override
             protected void updateItem(TrackEntry item, boolean empty) {
                 super.updateItem(item, empty);
@@ -1704,18 +1705,25 @@ public class SingSongArtworkUI extends Application {
                     imageView.setFitWidth(thumbSize);
                     imageView.setFitHeight(thumbSize);
                     imageView.setPreserveRatio(true);
-                    imageView.setOnMouseClicked(event -> {
-                        if (event.getClickCount() == 2 && event.isPrimaryButtonDown()) {
-                            showFullArtworkForTrack(item);
-                            event.consume();
-                        }
-                    });
                     setText(null);
                     setGraphic(imageView);
                 } catch (Exception ex) {
                     setText("-");
                     setGraphic(null);
                 }
+            }
+
+            {
+                // Handle double-click on artwork cell at cell level
+                setOnMouseClicked(event -> {
+                    if (event.getClickCount() == 2 && !isEmpty()) {
+                        TrackEntry rowItem = getItem();
+                        if (rowItem != null) {
+                            showFullArtworkForTrack(rowItem);
+                            event.consume();
+                        }
+                    }
+                });
             }
         });
         artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
