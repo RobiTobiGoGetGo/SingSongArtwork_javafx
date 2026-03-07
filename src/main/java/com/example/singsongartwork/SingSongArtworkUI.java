@@ -1134,7 +1134,9 @@ public class SingSongArtworkUI extends Application {
     private void applyArtworkToTracks(List<TrackEntry> selectedTracks, Path imagePath, String source) {
         int successCount = 0;
         int failureCount = 0;
+        int accessDeniedCount = 0;
         List<Path> modifiedPaths = new ArrayList<>();
+        List<String> failedFiles = new ArrayList<>();
         String firstFailureMessage = null;
 
         for (TrackEntry track : selectedTracks) {
@@ -1145,20 +1147,41 @@ public class SingSongArtworkUI extends Application {
                 modifiedPaths.add(mp3Path);
             } catch (Exception ex) {
                 failureCount++;
+                if (isAccessDeniedFailure(ex)) {
+                    accessDeniedCount++;
+                }
+                if (failedFiles.size() < 3) {
+                    failedFiles.add(track.getFilename());
+                }
                 if (firstFailureMessage == null) {
                     firstFailureMessage = ex.getMessage();
                 }
             }
         }
 
-        if (failureCount > 0 && firstFailureMessage != null && !firstFailureMessage.isBlank()) {
-            statusLabel.setText(String.format(
-                    "Artwork updated via %s: %d succeeded, %d failed (first error: %s)",
-                    source,
-                    successCount,
-                    failureCount,
-                    firstFailureMessage
-            ));
+        if (failureCount > 0) {
+            String failedSample = failedFiles.isEmpty() ? "" : ("; failed: " + String.join(", ", failedFiles));
+            if (accessDeniedCount > 0) {
+                statusLabel.setText(String.format(
+                        "Artwork updated via %s: %d succeeded, %d failed (%d permission denied)%s",
+                        source,
+                        successCount,
+                        failureCount,
+                        accessDeniedCount,
+                        failedSample
+                ));
+            } else if (firstFailureMessage != null && !firstFailureMessage.isBlank()) {
+                statusLabel.setText(String.format(
+                        "Artwork updated via %s: %d succeeded, %d failed (first error: %s)%s",
+                        source,
+                        successCount,
+                        failureCount,
+                        firstFailureMessage,
+                        failedSample
+                ));
+            } else {
+                statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed%s", source, successCount, failureCount, failedSample));
+            }
         } else {
             statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
         }
@@ -1193,6 +1216,21 @@ public class SingSongArtworkUI extends Application {
         Thread worker = new Thread(refreshTask, "artwork-refresh-loader");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    private boolean isAccessDeniedFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String msg = current.getMessage();
+            if (msg != null) {
+                String lower = msg.toLowerCase();
+                if (lower.contains("accessdenied") || lower.contains("permission") || lower.contains("unabletocreatefileexception")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private void openBatchEditDialog() {
