@@ -392,6 +392,53 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
+    private void handleArtworkDoubleClick(TrackEntry track, TableCell<TrackEntry, TrackEntry> cell) {
+        if (track == null) {
+            return;
+        }
+
+        // User mode: always preview artwork directly.
+        if (!adminMode) {
+            showFullArtworkForTrack(track);
+            return;
+        }
+
+        // Admin mode: offer contextual actions.
+        boolean hasVisibleArtwork = !"-".equals(cell.getText()) || cell.getGraphic() != null;
+
+        Alert actionDialog = new Alert(Alert.AlertType.CONFIRMATION);
+        actionDialog.setTitle("Artwork Actions");
+        actionDialog.setHeaderText(track.getFilename());
+
+        ButtonType youtubeButton = new ButtonType("Open YouTube", ButtonBar.ButtonData.LEFT);
+        ButtonType replaceButton = new ButtonType("Replace Artwork", ButtonBar.ButtonData.OTHER);
+        ButtonType showButton = new ButtonType("Show Artwork", ButtonBar.ButtonData.OK_DONE);
+
+        if (hasVisibleArtwork) {
+            actionDialog.setContentText("Choose an action for this track.");
+            actionDialog.getButtonTypes().setAll(showButton, replaceButton, youtubeButton, ButtonType.CANCEL);
+        } else {
+            actionDialog.setContentText("No artwork visible. Choose an action.");
+            actionDialog.getButtonTypes().setAll(replaceButton, youtubeButton, ButtonType.CANCEL);
+        }
+
+        ButtonType choice = actionDialog.showAndWait().orElse(ButtonType.CANCEL);
+        if (choice == youtubeButton) {
+            searchYouTubeMusicForTrack(track);
+        } else if (choice == replaceButton) {
+            if (trackTable != null) {
+                trackTable.getSelectionModel().clearSelection();
+                int rowIndex = cell.getIndex();
+                if (rowIndex >= 0 && rowIndex < trackTable.getItems().size()) {
+                    trackTable.getSelectionModel().select(rowIndex);
+                }
+            }
+            replaceArtworkForSelectedTracks();
+        } else if (choice == showButton) {
+            showFullArtworkForTrack(track);
+        }
+    }
+
     private void configureFilenameDoubleClick() {
         if (tableBuilder == null || tableBuilder.getFilenameColumn() == null) {
             return;
@@ -1802,7 +1849,7 @@ public class SingSongArtworkUI extends Application {
             }
 
             {
-                // Handle double-click on artwork cell at cell level.
+                // Handle double-click on artwork cell with role-aware actions.
                 setPickOnBounds(true);
                 setOnMouseClicked(event -> {
                     if (event.getClickCount() != 2 || isEmpty()) {
@@ -1815,17 +1862,7 @@ public class SingSongArtworkUI extends Application {
                         return;
                     }
 
-                    // If the cell currently shows "-", treat it as missing artwork from a UX perspective.
-                    boolean showsMissingArtwork = "-".equals(getText()) && getGraphic() == null;
-                    if (showsMissingArtwork) {
-                        if (adminMode) {
-                            searchYouTubeMusicForTrack(rowItem);
-                        } else if (statusLabel != null) {
-                            statusLabel.setText("No artwork available.");
-                        }
-                    } else {
-                        showFullArtworkForTrack(rowItem);
-                    }
+                    handleArtworkDoubleClick(rowItem, this);
                     event.consume();
                 });
             }
