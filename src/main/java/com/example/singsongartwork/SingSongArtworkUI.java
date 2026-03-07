@@ -856,21 +856,11 @@ public class SingSongArtworkUI extends Application {
         String contextMenuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
 
         if (adminMode) {
-            MenuItem openYouTubeItem = new MenuItem("Open YouTube Music...");
-            openYouTubeItem.setStyle(contextMenuItemStyle);
-            openYouTubeItem.setOnAction(e -> openYouTubeForSelectedTrack());
+            MenuItem artworkActionsItem = new MenuItem("Artwork actions...");
+            artworkActionsItem.setStyle(contextMenuItemStyle);
+            artworkActionsItem.setOnAction(e -> replaceArtworkForSelectedTracks());
 
-            MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
-            replaceArtworkItem.setStyle(contextMenuItemStyle);
-            replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
-
-            MenuItem batchEditItem = new MenuItem("Batch Edit Metadata...");
-            batchEditItem.setStyle(contextMenuItemStyle);
-            batchEditItem.setOnAction(e -> openBatchEditDialog());
-
-            contextMenu.getItems().add(openYouTubeItem);
-            contextMenu.getItems().add(replaceArtworkItem);
-            contextMenu.getItems().add(batchEditItem);
+            contextMenu.getItems().add(artworkActionsItem);
             contextMenu.getItems().add(new SeparatorMenuItem());
 
             MenuItem choicesSelectedItem = new MenuItem("Mark choices");
@@ -1299,79 +1289,6 @@ public class SingSongArtworkUI extends Application {
         return false;
     }
 
-    private void openBatchEditDialog() {
-        ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
-        if (selectedTracks == null || selectedTracks.isEmpty()) {
-            statusLabel.setText("Error: Please select at least one track");
-            return;
-        }
-
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Batch Edit Metadata");
-        dialog.setHeaderText("Update metadata for " + selectedTracks.size() + " selected tracks");
-
-        TextField titleField = new TextField();
-        titleField.setPromptText("New title (leave blank to keep existing)");
-
-        TextField artistField = new TextField();
-        artistField.setPromptText("New artist (leave blank to keep existing)");
-
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(10));
-        content.getChildren().add(new Label("Title:"));
-        content.getChildren().add(titleField);
-        content.getChildren().add(new Label("Artist:"));
-        content.getChildren().add(artistField);
-
-        dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
-
-        if (dialog.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) {
-            return;
-        }
-
-        String newTitle = titleField.getText();
-        String newArtist = artistField.getText();
-        if ((newTitle == null || newTitle.isBlank()) && (newArtist == null || newArtist.isBlank())) {
-            statusLabel.setText("Batch edit cancelled: no metadata values provided.");
-            return;
-        }
-
-        List<Path> paths = selectedTracks.stream().map(TrackEntry::getFilePath).toList();
-        int updated = service.batchEditMetadata(paths, newTitle, newArtist);
-        statusLabel.setText("Batch metadata edit updated " + updated + " tracks.");
-
-        for (Path path : paths) {
-            service.invalidateCache(path);
-        }
-
-        Task<Void> refreshTask = new Task<>() {
-            @Override
-            protected Void call() {
-                for (TrackEntry track : selectedTracks) {
-                    Path mp3Path = track.getFilePath();
-                    TrackEntry reloadedTrack = service.loadSingleTrack(mp3Path);
-                    if (reloadedTrack != null) {
-                        int idx = allTracksUnfiltered.indexOf(track);
-                        if (idx >= 0) {
-                            allTracksUnfiltered.set(idx, reloadedTrack);
-                        }
-                    }
-                }
-                return null;
-            }
-        };
-
-        refreshTask.setOnSucceeded(e -> {
-            applyFilterInternal(allTracksUnfiltered);
-            trackTable.refresh();
-        });
-
-        Thread worker = new Thread(refreshTask, "batch-metadata-refresher");
-        worker.setDaemon(true);
-        worker.start();
-    }
 
     private void saveLastMusicDirectory(Path directory) {
         configManager.saveLastMusicDirectory(directory);
