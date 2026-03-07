@@ -858,7 +858,7 @@ public class SingSongArtworkUI extends Application {
         if (adminMode) {
             MenuItem artworkActionsItem = new MenuItem("Artwork actions...");
             artworkActionsItem.setStyle(contextMenuItemStyle);
-            artworkActionsItem.setOnAction(e -> replaceArtworkForSelectedTracks());
+            artworkActionsItem.setOnAction(e -> openArtworkActionsForSelectedTrack());
 
             contextMenu.getItems().add(artworkActionsItem);
             contextMenu.getItems().add(new SeparatorMenuItem());
@@ -912,6 +912,28 @@ public class SingSongArtworkUI extends Application {
             return;
         }
         searchYouTubeMusicForTrack(selectedTrack);
+    }
+
+    private void openArtworkActionsForSelectedTrack() {
+        if (trackTable == null) {
+            return;
+        }
+        TrackEntry selectedTrack = trackTable.getSelectionModel().getSelectedItem();
+        if (selectedTrack == null) {
+            if (statusLabel != null) {
+                statusLabel.setText("Select a track first.");
+            }
+            return;
+        }
+        // Create a dummy cell to pass to handleArtworkDoubleClick
+        TableCell<TrackEntry, TrackEntry> dummyCell = new TableCell<TrackEntry, TrackEntry>() {
+            @Override
+            protected void updateItem(TrackEntry item, boolean empty) {
+                super.updateItem(item, empty);
+            }
+        };
+        dummyCell.setText("-");
+        handleArtworkDoubleClick(selectedTrack, dummyCell);
     }
 
     private void setChoicesForSelected(boolean chosen) {
