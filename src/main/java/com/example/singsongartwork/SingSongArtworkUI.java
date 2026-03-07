@@ -522,18 +522,6 @@ public class SingSongArtworkUI extends Application {
         return DialogFactory.showDirectoryPreview(directory, warningMessage);
     }
 
-    private TableView<TrackEntry> createTrackTable() {
-        if (tableBuilder != null) {
-            // Table is already built by builder in start().
-            return trackTable;
-        }
-
-        // Fallback if called without builder initialization.
-        TableView<TrackEntry> table = new TableView<>();
-        table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        return table;
-    }
 
     private void configureTableRowFactory(TableView<TrackEntry> table) {
         table.setRowFactory(tv -> new TableRow<>() {
@@ -584,13 +572,6 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
-    private byte[] getArtworkBytesForItem(TrackEntry item) {
-        byte[] embedded = item.getArtwork();
-        if (embedded.length > 0) {
-            return embedded;
-        }
-        return artworkBytesCache.getOrDefault(item.getFilePath(), new byte[0]);
-    }
 
     private void triggerArtworkLazyLoad(TrackEntry item) {
         Path path = item.getFilePath();
@@ -1057,55 +1038,6 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
-    private void rebuildOptionsMenu(MenuButton optionsMenu,
-                                    CustomMenuItem musicDirectoryMenuItem,
-                                    CustomMenuItem copyDirectoryMenuItem,
-                                    SeparatorMenuItem separator1,
-                                    MenuItem reloadItem,
-                                    SeparatorMenuItem separator2,
-                                    CheckMenuItem showChoicesOnlyItem,
-                                    MenuItem copyChoicesItem,
-                                    MenuItem clearChoicesItem,
-                                    MenuItem chooseCopyDirectoryItem,
-                                    Menu columnModeMenu,
-                                    Menu roleMenu) {
-        if (menuBarBuilder != null) {
-            menuBarBuilder.rebuildOptionsMenu(adminMode);
-            this.optionsMenu = menuBarBuilder.getOptionsMenu();
-            this.userRoleItem = menuBarBuilder.getUserRoleItem();
-            this.adminRoleItem = menuBarBuilder.getAdminRoleItem();
-            return;
-        }
-        optionsMenu.getItems().clear();
-
-        // Always visible items
-        optionsMenu.getItems().addAll(
-                musicDirectoryMenuItem,
-                copyDirectoryMenuItem,
-                separator1,
-                reloadItem,
-                separator2,
-                columnModeMenu,
-                new SeparatorMenuItem(),
-                roleMenu
-        );
-
-        // Admin-only items
-        if (adminMode) {
-            optionsMenu.getItems().add(new SeparatorMenuItem());
-            optionsMenu.getItems().add(new MenuItem("Choose music directory...") {
-                {
-                    setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
-                    setOnAction(e -> openDirectoryChooser());
-                }
-            });
-            optionsMenu.getItems().add(chooseCopyDirectoryItem);
-            optionsMenu.getItems().add(new SeparatorMenuItem());
-            optionsMenu.getItems().add(showChoicesOnlyItem);
-            optionsMenu.getItems().add(copyChoicesItem);
-            optionsMenu.getItems().add(clearChoicesItem);
-        }
-    }
 
     private void chooseCopyDirectory() {
         DirectoryChooser chooser = new DirectoryChooser();

@@ -138,58 +138,6 @@ public class DialogFactory {
         }
     }
 
-    /**
-     * Show password authentication dialog for Admin mode.
-     */
-    public static boolean showPasswordPrompt(String adminPassword) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Admin Authentication");
-        dialog.setHeaderText("Enter password to switch to Admin mode");
-
-        PasswordField passwordField = new PasswordField();
-        passwordField.setPromptText("Password");
-
-        VBox content = new VBox(8);
-        content.setPadding(new Insets(10));
-        content.getChildren().add(passwordField);
-        dialog.getDialogPane().setContent(content);
-
-        ButtonType okButton = new ButtonType("Unlock", ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(okButton, ButtonType.CANCEL);
-
-        Platform.runLater(passwordField::requestFocus);
-
-        ButtonType result = dialog.showAndWait().orElse(ButtonType.CANCEL);
-        return result == okButton && adminPassword.equals(passwordField.getText());
-    }
-
-    /**
-     * Show batch metadata edit dialog.
-     */
-    public static Dialog<ButtonType> showBatchEditDialog(int trackCount) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Batch Edit Metadata");
-        dialog.setHeaderText("Update metadata for " + trackCount + " selected tracks");
-
-        TextField titleField = new TextField();
-        titleField.setPromptText("New title (leave blank to keep existing)");
-
-        TextField artistField = new TextField();
-        artistField.setPromptText("New artist (leave blank to keep existing)");
-
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(10));
-        content.getChildren().add(new Label("Title:"));
-        content.getChildren().add(titleField);
-        content.getChildren().add(new Label("Artist:"));
-        content.getChildren().add(artistField);
-
-        dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
-
-        return dialog;
-    }
 
     /**
      * Show markdown file content in a dialog.

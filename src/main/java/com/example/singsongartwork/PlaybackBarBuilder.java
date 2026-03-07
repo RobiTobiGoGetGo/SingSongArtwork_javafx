@@ -118,12 +118,6 @@ public class PlaybackBarBuilder {
         return playbackSlider;
     }
 
-    /**
-     * Check if currently scrubbing (dragging slider).
-     */
-    public boolean isScrubbingPlayback() {
-        return scrubbingPlayback;
-    }
 
     /**
      * Set slider max duration.
