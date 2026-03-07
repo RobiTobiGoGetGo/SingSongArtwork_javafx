@@ -477,6 +477,16 @@ public class SingSongArtworkUI extends Application {
         dialog.setTitle("Admin Authentication");
         dialog.setHeaderText("Enter password to switch to Admin mode");
 
+        // Keep admin auth dialog consistent with app dark theme.
+        try {
+            var cssUrl = getClass().getResource("/styles/modern-dark.css");
+            if (cssUrl != null) {
+                dialog.getDialogPane().getStylesheets().add(cssUrl.toExternalForm());
+            }
+        } catch (Exception ignored) {
+            // Fall back to default styling if CSS is unavailable.
+        }
+
         PasswordField passwordField = new PasswordField();
         passwordField.setPromptText("Password");
 
@@ -1125,19 +1135,33 @@ public class SingSongArtworkUI extends Application {
         int successCount = 0;
         int failureCount = 0;
         List<Path> modifiedPaths = new ArrayList<>();
+        String firstFailureMessage = null;
 
         for (TrackEntry track : selectedTracks) {
             try {
-                Path mp3Path = currentDirectory.resolve(track.getFilename());
+                Path mp3Path = track.getFilePath();
                 service.addOrReplaceArtwork(mp3Path, imagePath);
                 successCount++;
                 modifiedPaths.add(mp3Path);
             } catch (Exception ex) {
                 failureCount++;
+                if (firstFailureMessage == null) {
+                    firstFailureMessage = ex.getMessage();
+                }
             }
         }
 
-        statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
+        if (failureCount > 0 && firstFailureMessage != null && !firstFailureMessage.isBlank()) {
+            statusLabel.setText(String.format(
+                    "Artwork updated via %s: %d succeeded, %d failed (first error: %s)",
+                    source,
+                    successCount,
+                    failureCount,
+                    firstFailureMessage
+            ));
+        } else {
+            statusLabel.setText(String.format("Artwork updated via %s: %d succeeded, %d failed", source, successCount, failureCount));
+        }
 
         Task<Void> refreshTask = new Task<>() {
             @Override
@@ -1210,7 +1234,7 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        List<Path> paths = selectedTracks.stream().map(track -> currentDirectory.resolve(track.getFilename())).toList();
+        List<Path> paths = selectedTracks.stream().map(TrackEntry::getFilePath).toList();
         int updated = service.batchEditMetadata(paths, newTitle, newArtist);
         statusLabel.setText("Batch metadata edit updated " + updated + " tracks.");
 
@@ -1222,7 +1246,7 @@ public class SingSongArtworkUI extends Application {
             @Override
             protected Void call() {
                 for (TrackEntry track : selectedTracks) {
-                    Path mp3Path = currentDirectory.resolve(track.getFilename());
+                    Path mp3Path = track.getFilePath();
                     TrackEntry reloadedTrack = service.loadSingleTrack(mp3Path);
                     if (reloadedTrack != null) {
                         int idx = allTracksUnfiltered.indexOf(track);
