@@ -88,7 +88,7 @@ public class SingSongArtworkUI extends Application {
     private static final String ADMIN_PASSWORD = "pwd";
     private static final DateTimeFormatter LOG_TS_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // Phase 3: Artwork cache and in-flight tracking for lazy loading
+    // Artwork cache and in-flight tracking for lazy loading.
     private final Map<Path, byte[]> artworkBytesCache = new ConcurrentHashMap<>();
     private final Set<Path> artworkLoadsInFlight = ConcurrentHashMap.newKeySet();
     private static final PseudoClass PLAYING_ROW_PSEUDO_CLASS = PseudoClass.getPseudoClass("playing");
@@ -256,7 +256,7 @@ public class SingSongArtworkUI extends Application {
 
         primaryStage.show();
 
-        // Step 12: If music directory is set, automatically show preview and load files
+        // If a music directory is already known, prompt preview and then load.
         // If not set, user must manually choose via "Choose music directory" menu
         if (currentDirectory != null && Files.isDirectory(currentDirectory)) {
             Platform.runLater(() -> {
@@ -546,7 +546,7 @@ public class SingSongArtworkUI extends Application {
             }
         });
 
-        // Step 19: Add space key handler to toggle choice checkbox
+        // Space toggles the choice state for all selected rows.
         table.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.SPACE) {
                 event.consume();
@@ -908,7 +908,7 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        // Step 13: Use saved copy directory path instead of showing chooser
+        // Use the persisted destination directory instead of reopening a chooser.
         Path copyDirectory = getLastCopyDirectory();
 
         // DEBUG: Log the destination being used
@@ -944,7 +944,7 @@ public class SingSongArtworkUI extends Application {
 
         statusLabel.setText("Copied choices: " + successCount + " succeeded, " + failureCount + " failed");
 
-        // Step 18: Open the copy directory in Windows Explorer if copy was successful
+        // Open the destination folder after a successful copy.
         if (successCount > 0) {
             openDirectoryInExplorer(copyDirectory);
         }
