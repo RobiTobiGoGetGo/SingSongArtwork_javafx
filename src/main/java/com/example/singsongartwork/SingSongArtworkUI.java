@@ -288,9 +288,6 @@ public class SingSongArtworkUI extends Application {
                 enabled -> {
                     largeArtworkMode = enabled;
                     if (trackTable != null) {
-                        if (artworkColumn != null) {
-                            artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 2);
-                        }
                         trackTable.refresh();
                     }
                 }
@@ -1733,10 +1730,10 @@ public class SingSongArtworkUI extends Application {
             }
         });
         artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
-        int size = largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL;
-        artworkColumn.setPrefWidth(size);
-        artworkColumn.setMinWidth(size);
-        artworkColumn.setMaxWidth(size);
+        // Always use LARGE size to accommodate both small and large artwork modes
+        artworkColumn.setPrefWidth(ARTWORK_THUMB_LARGE);
+        artworkColumn.setMinWidth(ARTWORK_THUMB_LARGE);
+        artworkColumn.setMaxWidth(ARTWORK_THUMB_LARGE);
         artworkColumn.setSortable(true);
         artworkColumn.setResizable(false);
 
