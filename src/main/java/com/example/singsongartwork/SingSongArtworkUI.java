@@ -1791,21 +1791,31 @@ public class SingSongArtworkUI extends Application {
             }
 
             {
-                // Handle double-click on artwork cell at cell level
+                // Handle double-click on artwork cell at cell level.
+                setPickOnBounds(true);
                 setOnMouseClicked(event -> {
-                    if (event.getClickCount() == 2 && !isEmpty()) {
-                        TrackEntry rowItem = getItem();
-                        if (rowItem != null) {
-                            // If artwork is missing and in Admin mode, search YouTube Music
-                            if (!rowItem.hasArtwork() && adminMode) {
-                                searchYouTubeMusicForTrack(rowItem);
-                            } else if (rowItem.hasArtwork()) {
-                                // Show full artwork if it exists
-                                showFullArtworkForTrack(rowItem);
-                            }
-                            event.consume();
-                        }
+                    if (event.getClickCount() != 2 || isEmpty()) {
+                        return;
                     }
+
+                    TableRow<TrackEntry> row = getTableRow();
+                    TrackEntry rowItem = row == null ? null : row.getItem();
+                    if (rowItem == null) {
+                        return;
+                    }
+
+                    // If the cell currently shows "-", treat it as missing artwork from a UX perspective.
+                    boolean showsMissingArtwork = "-".equals(getText()) && getGraphic() == null;
+                    if (showsMissingArtwork) {
+                        if (adminMode) {
+                            searchYouTubeMusicForTrack(rowItem);
+                        } else if (statusLabel != null) {
+                            statusLabel.setText("No artwork available.");
+                        }
+                    } else {
+                        showFullArtworkForTrack(rowItem);
+                    }
+                    event.consume();
                 });
             }
         });
