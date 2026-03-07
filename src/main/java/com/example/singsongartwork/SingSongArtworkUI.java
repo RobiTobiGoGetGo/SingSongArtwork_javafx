@@ -809,6 +809,10 @@ public class SingSongArtworkUI extends Application {
         String contextMenuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
 
         if (adminMode) {
+            MenuItem openYouTubeItem = new MenuItem("Open YouTube Music...");
+            openYouTubeItem.setStyle(contextMenuItemStyle);
+            openYouTubeItem.setOnAction(e -> openYouTubeForSelectedTrack());
+
             MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
             replaceArtworkItem.setStyle(contextMenuItemStyle);
             replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
@@ -817,6 +821,7 @@ public class SingSongArtworkUI extends Application {
             batchEditItem.setStyle(contextMenuItemStyle);
             batchEditItem.setOnAction(e -> openBatchEditDialog());
 
+            contextMenu.getItems().add(openYouTubeItem);
             contextMenu.getItems().add(replaceArtworkItem);
             contextMenu.getItems().add(batchEditItem);
             contextMenu.getItems().add(new SeparatorMenuItem());
@@ -856,6 +861,20 @@ public class SingSongArtworkUI extends Application {
         }
 
         return contextMenu;
+    }
+
+    private void openYouTubeForSelectedTrack() {
+        if (trackTable == null) {
+            return;
+        }
+        TrackEntry selectedTrack = trackTable.getSelectionModel().getSelectedItem();
+        if (selectedTrack == null) {
+            if (statusLabel != null) {
+                statusLabel.setText("Select a track first.");
+            }
+            return;
+        }
+        searchYouTubeMusicForTrack(selectedTrack);
     }
 
     private void setChoicesForSelected(boolean chosen) {
