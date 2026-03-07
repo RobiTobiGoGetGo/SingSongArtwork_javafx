@@ -108,6 +108,10 @@ public class SingSongArtworkUI extends Application {
     private PlaybackBarBuilder playbackBarBuilder;
     private final StringBuilder appLogBuffer = new StringBuilder();
 
+    private static final int ARTWORK_THUMB_SMALL = 48;
+    private static final int ARTWORK_THUMB_LARGE = 96;
+    private boolean largeArtworkMode = false;
+
     @Override
     public void start(Stage primaryStage) {
         service = new Mp3MetadataService();
@@ -279,7 +283,16 @@ public class SingSongArtworkUI extends Application {
                         statusLabel.setText(showChoicesOnly ? "Showing choices only" : "Showing all tracks");
                     }
                 },
-                this::copyChoicesTracksToCopyDirectory
+                this::copyChoicesTracksToCopyDirectory,
+                enabled -> {
+                    largeArtworkMode = enabled;
+                    if (trackTable != null) {
+                        if (artworkColumn != null) {
+                            artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 24);
+                        }
+                        trackTable.refresh();
+                    }
+                }
         );
         VBox panel = filterPanelBuilder.buildPanel();
         // Keep legacy field for existing shortcuts/focus logic.
@@ -395,13 +408,23 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void configureTableRowFactory(TableView<TrackEntry> table) {
-        table.setRowFactory(tv -> new TableRow<>() {
-            @Override
-            protected void updateItem(TrackEntry item, boolean empty) {
-                super.updateItem(item, empty);
-                boolean isPlayingRow = !empty && item != null && isCurrentTrack(item);
-                pseudoClassStateChanged(PLAYING_ROW_PSEUDO_CLASS, isPlayingRow);
-            }
+        table.setRowFactory(tv -> {
+            TableRow<TrackEntry> row = new TableRow<>() {
+                @Override
+                protected void updateItem(TrackEntry item, boolean empty) {
+                    super.updateItem(item, empty);
+                    boolean isPlayingRow = !empty && item != null && isCurrentTrack(item);
+                    pseudoClassStateChanged(PLAYING_ROW_PSEUDO_CLASS, isPlayingRow);
+                }
+            };
+
+            // Make row-level context actions work on the row the user right-clicked.
+            row.setOnContextMenuRequested(event -> {
+                if (!row.isEmpty()) {
+                    table.getSelectionModel().select(row.getIndex());
+                }
+            });
+            return row;
         });
 
         // Step 19: Add space key handler to toggle choice checkbox
@@ -677,6 +700,10 @@ public class SingSongArtworkUI extends Application {
         String contextMenuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
 
         if (adminMode) {
+            MenuItem viewArtworkItem = new MenuItem("View Full Artwork...");
+            viewArtworkItem.setStyle(contextMenuItemStyle);
+            viewArtworkItem.setOnAction(e -> showFullArtworkForSelectedRow());
+
             MenuItem replaceArtworkItem = new MenuItem("Replace Artwork...");
             replaceArtworkItem.setStyle(contextMenuItemStyle);
             replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
@@ -685,6 +712,7 @@ public class SingSongArtworkUI extends Application {
             batchEditItem.setStyle(contextMenuItemStyle);
             batchEditItem.setOnAction(e -> openBatchEditDialog());
 
+            contextMenu.getItems().add(viewArtworkItem);
             contextMenu.getItems().add(replaceArtworkItem);
             contextMenu.getItems().add(batchEditItem);
             contextMenu.getItems().add(new SeparatorMenuItem());
@@ -717,13 +745,44 @@ public class SingSongArtworkUI extends Application {
             contextMenu.getItems().add(copyFilenameItem);
         } else {
             // User mode: only copy filename is available
+            MenuItem viewArtworkItem = new MenuItem("View Full Artwork...");
+            viewArtworkItem.setStyle(contextMenuItemStyle);
+            viewArtworkItem.setOnAction(e -> showFullArtworkForSelectedRow());
+
             MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
             copyFilenameItem.setStyle(contextMenuItemStyle);
             copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
+            contextMenu.getItems().add(viewArtworkItem);
             contextMenu.getItems().add(copyFilenameItem);
         }
 
         return contextMenu;
+    }
+
+    private void showFullArtworkForSelectedRow() {
+        if (trackTable == null) {
+            return;
+        }
+
+        TrackEntry selected = trackTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            if (statusLabel != null) {
+                statusLabel.setText("Select a row to preview artwork.");
+            }
+            return;
+        }
+
+        byte[] bytes = artworkBytesCache.getOrDefault(selected.getFilePath(), new byte[0]);
+        if (bytes.length == 0 && selected.hasArtwork()) {
+            // Load on demand for full-size preview
+            bytes = service.loadArtworkBytes(selected.getFilePath());
+            if (bytes != null && bytes.length > 0) {
+                artworkBytesCache.put(selected.getFilePath(), bytes);
+                trackTable.refresh();
+            }
+        }
+
+        DialogFactory.showArtworkCard(selected.getFilename(), bytes);
     }
 
     private void setChoicesForSelected(boolean chosen) {
@@ -1625,15 +1684,16 @@ public class SingSongArtworkUI extends Application {
 
                 // Display cached artwork
                 try {
-                    Image image = new Image(new ByteArrayInputStream(artworkBytes), 48, 48, true, true);
+                    int thumbSize = largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL;
+                    Image image = new Image(new ByteArrayInputStream(artworkBytes), thumbSize, thumbSize, true, true);
                     if (image.isError()) {
                         setText("-");
                         setGraphic(null);
                         return;
                     }
                     ImageView imageView = new ImageView(image);
-                    imageView.setFitWidth(48);
-                    imageView.setFitHeight(48);
+                    imageView.setFitWidth(thumbSize);
+                    imageView.setFitHeight(thumbSize);
                     imageView.setPreserveRatio(true);
                     setText(null);
                     setGraphic(imageView);
@@ -1644,7 +1704,7 @@ public class SingSongArtworkUI extends Application {
             }
         });
         artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
-        artworkColumn.setPrefWidth(120);
+        artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 24);
         artworkColumn.setSortable(true);
         artworkColumn.setResizable(true);
 

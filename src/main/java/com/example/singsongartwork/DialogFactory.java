@@ -2,9 +2,16 @@ package com.example.singsongartwork;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.control.ScrollPane;
+import javafx.stage.Screen;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -280,5 +287,58 @@ public class DialogFactory {
         alert.getDialogPane().setContent(textArea);
         alert.showAndWait();
     }
-}
 
+    /**
+     * Show a popup card with full-size artwork.
+     */
+    public static void showArtworkCard(String title, byte[] artworkBytes) {
+        if (artworkBytes == null || artworkBytes.length == 0) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Artwork Preview");
+            alert.setHeaderText(title);
+            alert.setContentText("No artwork available for this track.");
+            alert.showAndWait();
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Artwork Preview");
+        dialog.setHeaderText(title);
+
+        try {
+            Image image = new Image(new ByteArrayInputStream(artworkBytes));
+            if (image.isError()) {
+                throw new IllegalStateException("Invalid artwork image data");
+            }
+
+            Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
+            // About a quarter of total screen area: half width x half height.
+            double initialWidth = Math.max(420, bounds.getWidth() * 0.5);
+            double initialHeight = Math.max(320, bounds.getHeight() * 0.5);
+
+            ImageView imageView = new ImageView(image);
+            imageView.setPreserveRatio(true);
+            imageView.setFitWidth(initialWidth - 48);
+            imageView.setFitHeight(initialHeight - 96);
+
+            ScrollPane scrollPane = new ScrollPane(new StackPane(imageView));
+            scrollPane.setFitToWidth(true);
+            scrollPane.setFitToHeight(true);
+            scrollPane.setPannable(true);
+            scrollPane.setPrefViewportWidth(initialWidth);
+            scrollPane.setPrefViewportHeight(initialHeight);
+
+            dialog.getDialogPane().setContent(scrollPane);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            dialog.getDialogPane().setPrefWidth(initialWidth);
+            dialog.getDialogPane().setPrefHeight(initialHeight);
+            dialog.showAndWait();
+        } catch (Exception ex) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Artwork Preview");
+            alert.setHeaderText(title);
+            alert.setContentText("Could not display artwork: " + ex.getMessage());
+            alert.showAndWait();
+        }
+    }
+}

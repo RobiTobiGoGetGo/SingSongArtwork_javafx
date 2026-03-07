@@ -27,16 +27,22 @@ public class FilterPanelBuilder {
     private final java.util.function.Consumer<String> onFilterChanged;
     private final Runnable onToggleShowChoices;
     private final Runnable onCopyChoices;
+    private Button largeArtworkToggleBtn;
+    private boolean largeArtworkMode = false;
+
+    private final java.util.function.Consumer<Boolean> onToggleLargeArtwork;
 
     public FilterPanelBuilder(
             Set<String> defaultTerms,
             java.util.function.Consumer<String> onFilterChanged,
             Runnable onToggleShowChoices,
-            Runnable onCopyChoices) {
+            Runnable onCopyChoices,
+            java.util.function.Consumer<Boolean> onToggleLargeArtwork) {
         this.defaultTerms = defaultTerms;
         this.onFilterChanged = onFilterChanged;
         this.onToggleShowChoices = onToggleShowChoices;
         this.onCopyChoices = onCopyChoices;
+        this.onToggleLargeArtwork = onToggleLargeArtwork;
     }
 
     /**
@@ -99,6 +105,12 @@ public class FilterPanelBuilder {
         copyChoicesBtn.setTooltip(new Tooltip("Copy choices to copy directory"));
         copyChoicesBtn.setOnAction(e -> onCopyChoices.run());
 
+        // Toggle for larger artwork icons
+        largeArtworkToggleBtn = new Button("Art+");
+        largeArtworkToggleBtn.setStyle(barButtonBaseStyle + " -fx-opacity: 0.75;");
+        largeArtworkToggleBtn.setTooltip(new Tooltip("Toggle larger artwork icons"));
+        largeArtworkToggleBtn.setOnAction(e -> toggleLargeArtworkMode());
+
         // Loading indicator
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setVisible(false);
@@ -114,6 +126,7 @@ public class FilterPanelBuilder {
                 filterComboBox,
                 clearFilterBtn,
                 loadingIndicator,
+                largeArtworkToggleBtn,
                 rightSpacer,
                 copyChoicesBtn
         );
@@ -238,6 +251,33 @@ public class FilterPanelBuilder {
     public void setFilterDisabled(boolean disabled) {
         if (filterTextField != null) {
             filterTextField.setDisable(disabled);
+        }
+    }
+
+    private void toggleLargeArtworkMode() {
+        largeArtworkMode = !largeArtworkMode;
+        updateLargeArtworkButton();
+        onToggleLargeArtwork.accept(largeArtworkMode);
+    }
+
+    private void updateLargeArtworkButton() {
+        String barButtonBaseStyle = "-fx-font-size: 13px; -fx-padding: 6px 10px; -fx-min-height: 34px; -fx-pref-height: 34px;";
+        if (largeArtworkToggleBtn != null) {
+            largeArtworkToggleBtn.setStyle(largeArtworkMode
+                    ? barButtonBaseStyle + " -fx-opacity: 1.0;"
+                    : barButtonBaseStyle + " -fx-opacity: 0.75;");
+        }
+    }
+
+    public boolean isLargeArtworkMode() {
+        return largeArtworkMode;
+    }
+
+    public void setLargeArtworkMode(boolean desired) {
+        if (largeArtworkMode != desired) {
+            largeArtworkMode = desired;
+            updateLargeArtworkButton();
+            onToggleLargeArtwork.accept(largeArtworkMode);
         }
     }
 }
