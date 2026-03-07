@@ -232,22 +232,27 @@ public class MenuBarBuilder {
             return;
         }
 
+        // Preserve existing directory texts before clearing
+        String musicText = musicDirectoryMenuItem != null ? musicDirectoryMenuItem.getText() : "Music: Not set";
+        String copyText = copyDirectoryMenuItem != null ? copyDirectoryMenuItem.getText() : "Copy: Not set";
+        String artworkText = artworkDirectoryMenuItem != null ? artworkDirectoryMenuItem.getText() : "Artwork: Not set";
+
         optionsMenu.getItems().clear();
 
-        // Directory menu items at top
-        musicDirectoryMenuItem = new MenuItem("Music: Not set");
+        // Directory menu items at top - preserve existing text
+        musicDirectoryMenuItem = new MenuItem(musicText);
         musicDirectoryMenuItem.setStyle(menuItemStyle);
         musicDirectoryMenuItem.setDisable(!isAdmin); // Enabled only in Admin mode
         musicDirectoryMenuItem.setOnAction(e -> onChooseMusicDirectory.run());
         optionsMenu.getItems().add(musicDirectoryMenuItem);
 
-        copyDirectoryMenuItem = new MenuItem("Copy: Not set");
+        copyDirectoryMenuItem = new MenuItem(copyText);
         copyDirectoryMenuItem.setStyle(menuItemStyle);
         copyDirectoryMenuItem.setDisable(!isAdmin); // Enabled only in Admin mode
         copyDirectoryMenuItem.setOnAction(e -> onChooseCopyDirectory.run());
         optionsMenu.getItems().add(copyDirectoryMenuItem);
 
-        artworkDirectoryMenuItem = new MenuItem("Artwork: Not set");
+        artworkDirectoryMenuItem = new MenuItem(artworkText);
         artworkDirectoryMenuItem.setStyle(menuItemStyle);
         artworkDirectoryMenuItem.setDisable(!isAdmin); // Enabled only in Admin mode
         artworkDirectoryMenuItem.setOnAction(e -> onChooseArtworkDirectory.run());
