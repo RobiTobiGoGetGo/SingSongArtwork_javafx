@@ -1733,9 +1733,12 @@ public class SingSongArtworkUI extends Application {
             }
         });
         artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
-        artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 2);
+        int size = largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL;
+        artworkColumn.setPrefWidth(size);
+        artworkColumn.setMinWidth(size);
+        artworkColumn.setMaxWidth(size);
         artworkColumn.setSortable(true);
-        artworkColumn.setResizable(true);
+        artworkColumn.setResizable(false);
 
         // Insert artwork column back at position 2 (after choices and transport)
         table.getColumns().add(2, artworkColumn);
