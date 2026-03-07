@@ -358,6 +358,23 @@ public class SingSongArtworkUI extends Application {
             String encodedQuery = java.net.URLEncoder.encode(searchQuery.toString(), "UTF-8");
             String youtubeUrl = "https://music.youtube.com/search?q=" + encodedQuery;
 
+            // Show warning/confirmation before opening external site
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle("Open YouTube Music");
+            confirm.setHeaderText("No artwork found for this track");
+            confirm.setContentText("Search on YouTube Music for:\n\n" + searchQuery + "\n\nOpen YouTube Music now?");
+
+            ButtonType openButton = new ButtonType("Open", ButtonBar.ButtonData.OK_DONE);
+            confirm.getButtonTypes().setAll(openButton, ButtonType.CANCEL);
+
+            ButtonType chosen = confirm.showAndWait().orElse(ButtonType.CANCEL);
+            if (chosen != openButton) {
+                if (statusLabel != null) {
+                    statusLabel.setText("YouTube Music search cancelled");
+                }
+                return;
+            }
+
             // Open in default browser
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(new URI(youtubeUrl));
