@@ -328,9 +328,9 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        tableBuilder.getFilenameColumn().setCellFactory(col -> new TableCell<String>() {
+        tableBuilder.getFilenameColumn().setCellFactory(col -> new TableCell<TrackEntry, String>() {
             @Override
-            protected void updateItem(String item, boolean empty) {
+            public void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty ? null : item);
                 setGraphic(null);
@@ -340,15 +340,18 @@ public class SingSongArtworkUI extends Application {
                 // Handle double-click on filename cell
                 setOnMouseClicked(event -> {
                     if (event.getClickCount() == 2 && !isEmpty()) {
-                        TrackEntry rowTrack = getTableRow() == null ? null : (TrackEntry) getTableRow().getItem();
-                        if (rowTrack != null) {
-                            ClipboardContent content = new ClipboardContent();
-                            content.putString(rowTrack.getFilename());
-                            Clipboard.getSystemClipboard().setContent(content);
-                            if (statusLabel != null) {
-                                statusLabel.setText("Copied filename to clipboard: " + rowTrack.getFilename());
+                        TableRow<TrackEntry> row = getTableRow();
+                        if (row != null) {
+                            TrackEntry rowTrack = row.getItem();
+                            if (rowTrack != null) {
+                                ClipboardContent content = new ClipboardContent();
+                                content.putString(rowTrack.getFilename());
+                                Clipboard.getSystemClipboard().setContent(content);
+                                if (statusLabel != null) {
+                                    statusLabel.setText("Copied filename to clipboard: " + rowTrack.getFilename());
+                                }
+                                event.consume();
                             }
-                            event.consume();
                         }
                     }
                 });
@@ -1664,7 +1667,7 @@ public class SingSongArtworkUI extends Application {
         // Create new artwork column with proper caching and lazy-loading
         artworkColumn = new TableColumn<>("Artwork");
         artworkColumn.setCellValueFactory(cellData -> new ReadOnlyObjectWrapper<>(cellData.getValue()));
-        artworkColumn.setCellFactory(col -> new TableCell<TrackEntry, TrackEntry>() {
+        artworkColumn.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(TrackEntry item, boolean empty) {
                 super.updateItem(item, empty);
