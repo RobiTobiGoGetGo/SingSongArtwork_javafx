@@ -151,7 +151,15 @@ public class TrackTableBuilder {
     private void createFilenameColumn() {
         filenameColumn = new TableColumn<>("Filename");
         filenameColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getFilename()));
-        filenameColumn.setPrefWidth(320);
+        filenameColumn.setCellFactory(col -> new TableCell<TrackEntry, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : item);
+                setStyle("-fx-alignment: CENTER_LEFT;");
+            }
+        });
+        filenameColumn.setPrefWidth(240);
         filenameColumn.setSortable(true);
         filenameColumn.setResizable(true);
     }
@@ -159,7 +167,15 @@ public class TrackTableBuilder {
     private void createTitleColumn() {
         titleColumn = new TableColumn<>("Title");
         titleColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTitle()));
-        titleColumn.setPrefWidth(260);
+        titleColumn.setCellFactory(col -> new TableCell<TrackEntry, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : item);
+                setStyle("-fx-alignment: CENTER_LEFT;");
+            }
+        });
+        titleColumn.setPrefWidth(240);
         titleColumn.setSortable(true);
         titleColumn.setResizable(true);
     }
@@ -167,7 +183,15 @@ public class TrackTableBuilder {
     private void createArtistColumn() {
         artistColumn = new TableColumn<>("Artist");
         artistColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getArtist()));
-        artistColumn.setPrefWidth(240);
+        artistColumn.setCellFactory(col -> new TableCell<TrackEntry, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : item);
+                setStyle("-fx-alignment: CENTER_LEFT;");
+            }
+        });
+        artistColumn.setPrefWidth(200);
         artistColumn.setSortable(true);
         artistColumn.setResizable(true);
     }
