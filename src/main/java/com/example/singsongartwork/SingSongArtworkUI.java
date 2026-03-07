@@ -379,79 +379,6 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
-    private void searchYouTubeMusicForTrack(TrackEntry track) {
-        if (track == null) {
-            return;
-        }
-
-        // Build search query from filename and artist
-        String filename = track.getFilename();
-        String artist = track.getArtist();
-
-        // Remove file extension from filename
-        if (filename != null && filename.toLowerCase().endsWith(".mp3")) {
-            filename = filename.substring(0, filename.length() - 4);
-        }
-
-        // Combine filename and artist for search
-        StringBuilder searchQuery = new StringBuilder();
-        if (filename != null && !filename.isBlank()) {
-            searchQuery.append(filename);
-        }
-        if (artist != null && !artist.isBlank()) {
-            if (searchQuery.length() > 0) {
-                searchQuery.append(" ");
-            }
-            searchQuery.append(artist);
-        }
-
-        if (searchQuery.length() == 0) {
-            if (statusLabel != null) {
-                statusLabel.setText("Cannot search: no filename or artist available");
-            }
-            return;
-        }
-
-        try {
-            // URL encode the search query
-            String encodedQuery = java.net.URLEncoder.encode(searchQuery.toString(), "UTF-8");
-            String youtubeUrl = "https://music.youtube.com/search?q=" + encodedQuery;
-
-            // Show warning/confirmation before opening external site
-            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-            confirm.setTitle("Open YouTube Music");
-            confirm.setHeaderText("No artwork found for this track");
-            confirm.setContentText("Search on YouTube Music for:\n\n" + searchQuery + "\n\nOpen YouTube Music now?");
-
-            ButtonType openButton = new ButtonType("Open", ButtonBar.ButtonData.OK_DONE);
-            confirm.getButtonTypes().setAll(openButton, ButtonType.CANCEL);
-
-            ButtonType chosen = confirm.showAndWait().orElse(ButtonType.CANCEL);
-            if (chosen != openButton) {
-                if (statusLabel != null) {
-                    statusLabel.setText("YouTube Music search cancelled");
-                }
-                return;
-            }
-
-            // Open in default browser
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(new URI(youtubeUrl));
-                if (statusLabel != null) {
-                    statusLabel.setText("Opened YouTube Music search for: " + searchQuery);
-                }
-            } else {
-                if (statusLabel != null) {
-                    statusLabel.setText("Error: Cannot open browser");
-                }
-            }
-        } catch (Exception ex) {
-            if (statusLabel != null) {
-                statusLabel.setText("Error opening YouTube Music: " + ex.getMessage());
-            }
-            System.err.println("[ERROR] Failed to open YouTube Music: " + ex.getMessage());
-        }
-    }
 
     private void handleArtworkDoubleClick(TrackEntry track, TableCell<TrackEntry, TrackEntry> cell) {
         if (track == null) {
@@ -472,23 +399,20 @@ public class SingSongArtworkUI extends Application {
         actionDialog.setHeaderText(track.getFilename());
 
         ButtonType youtubeButton = new ButtonType("Open YouTube", ButtonBar.ButtonData.LEFT);
-        ButtonType youtubeMusicButton = new ButtonType("Open YouTube Music", ButtonBar.ButtonData.LEFT);
         ButtonType replaceButton = new ButtonType("Replace Artwork", ButtonBar.ButtonData.OTHER);
         ButtonType showButton = new ButtonType("Show Artwork", ButtonBar.ButtonData.OK_DONE);
 
         if (hasVisibleArtwork) {
             actionDialog.setContentText("Choose an action for this track.");
-            actionDialog.getButtonTypes().setAll(showButton, replaceButton, youtubeButton, youtubeMusicButton, ButtonType.CANCEL);
+            actionDialog.getButtonTypes().setAll(showButton, replaceButton, youtubeButton, ButtonType.CANCEL);
         } else {
             actionDialog.setContentText("No artwork visible. Choose an action.");
-            actionDialog.getButtonTypes().setAll(replaceButton, youtubeButton, youtubeMusicButton, ButtonType.CANCEL);
+            actionDialog.getButtonTypes().setAll(replaceButton, youtubeButton, ButtonType.CANCEL);
         }
 
         ButtonType choice = actionDialog.showAndWait().orElse(ButtonType.CANCEL);
         if (choice == youtubeButton) {
             searchYouTubeForTrack(track);
-        } else if (choice == youtubeMusicButton) {
-            searchYouTubeMusicForTrack(track);
         } else if (choice == replaceButton) {
             if (trackTable != null) {
                 trackTable.getSelectionModel().clearSelection();
