@@ -289,7 +289,7 @@ public class SingSongArtworkUI extends Application {
                     largeArtworkMode = enabled;
                     if (trackTable != null) {
                         if (artworkColumn != null) {
-                            artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 8);
+                            artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 2);
                         }
                         trackTable.refresh();
                     }
@@ -1730,7 +1730,7 @@ public class SingSongArtworkUI extends Application {
             }
         });
         artworkColumn.setComparator((a, b) -> Boolean.compare(a.hasArtwork(), b.hasArtwork()));
-        artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 8);
+        artworkColumn.setPrefWidth((largeArtworkMode ? ARTWORK_THUMB_LARGE : ARTWORK_THUMB_SMALL) + 2);
         artworkColumn.setSortable(true);
         artworkColumn.setResizable(true);
 
