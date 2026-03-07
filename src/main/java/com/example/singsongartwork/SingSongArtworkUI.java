@@ -322,6 +322,63 @@ public class SingSongArtworkUI extends Application {
         DialogFactory.showArtworkCard(track.getFilename(), bytes);
     }
 
+    private void searchYouTubeForTrack(TrackEntry track) {
+        if (track == null) {
+            return;
+        }
+
+        // Build search query from filename and artist
+        String filename = track.getFilename();
+        String artist = track.getArtist();
+
+        // Remove file extension from filename
+        if (filename != null && filename.toLowerCase().endsWith(".mp3")) {
+            filename = filename.substring(0, filename.length() - 4);
+        }
+
+        // Combine filename and artist for search
+        StringBuilder searchQuery = new StringBuilder();
+        if (filename != null && !filename.isBlank()) {
+            searchQuery.append(filename);
+        }
+        if (artist != null && !artist.isBlank()) {
+            if (searchQuery.length() > 0) {
+                searchQuery.append(" ");
+            }
+            searchQuery.append(artist);
+        }
+
+        if (searchQuery.length() == 0) {
+            if (statusLabel != null) {
+                statusLabel.setText("Cannot search: no filename or artist available");
+            }
+            return;
+        }
+
+        try {
+            // URL encode the search query
+            String encodedQuery = java.net.URLEncoder.encode(searchQuery.toString(), "UTF-8");
+            String youtubeUrl = "https://www.youtube.com/results?search_query=" + encodedQuery;
+
+            // Open directly in default browser without confirmation
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(new URI(youtubeUrl));
+                if (statusLabel != null) {
+                    statusLabel.setText("Opened YouTube search for: " + searchQuery);
+                }
+            } else {
+                if (statusLabel != null) {
+                    statusLabel.setText("Error: Cannot open browser");
+                }
+            }
+        } catch (Exception ex) {
+            if (statusLabel != null) {
+                statusLabel.setText("Error opening YouTube: " + ex.getMessage());
+            }
+            System.err.println("[ERROR] Failed to open YouTube: " + ex.getMessage());
+        }
+    }
+
     private void searchYouTubeMusicForTrack(TrackEntry track) {
         if (track == null) {
             return;
@@ -415,19 +472,22 @@ public class SingSongArtworkUI extends Application {
         actionDialog.setHeaderText(track.getFilename());
 
         ButtonType youtubeButton = new ButtonType("Open YouTube", ButtonBar.ButtonData.LEFT);
+        ButtonType youtubeMusicButton = new ButtonType("Open YouTube Music", ButtonBar.ButtonData.LEFT);
         ButtonType replaceButton = new ButtonType("Replace Artwork", ButtonBar.ButtonData.OTHER);
         ButtonType showButton = new ButtonType("Show Artwork", ButtonBar.ButtonData.OK_DONE);
 
         if (hasVisibleArtwork) {
             actionDialog.setContentText("Choose an action for this track.");
-            actionDialog.getButtonTypes().setAll(showButton, replaceButton, youtubeButton, ButtonType.CANCEL);
+            actionDialog.getButtonTypes().setAll(showButton, replaceButton, youtubeButton, youtubeMusicButton, ButtonType.CANCEL);
         } else {
             actionDialog.setContentText("No artwork visible. Choose an action.");
-            actionDialog.getButtonTypes().setAll(replaceButton, youtubeButton, ButtonType.CANCEL);
+            actionDialog.getButtonTypes().setAll(replaceButton, youtubeButton, youtubeMusicButton, ButtonType.CANCEL);
         }
 
         ButtonType choice = actionDialog.showAndWait().orElse(ButtonType.CANCEL);
         if (choice == youtubeButton) {
+            searchYouTubeForTrack(track);
+        } else if (choice == youtubeMusicButton) {
             searchYouTubeMusicForTrack(track);
         } else if (choice == replaceButton) {
             if (trackTable != null) {
@@ -881,19 +941,6 @@ public class SingSongArtworkUI extends Application {
         return contextMenu;
     }
 
-    private void openYouTubeForSelectedTrack() {
-        if (trackTable == null) {
-            return;
-        }
-        TrackEntry selectedTrack = trackTable.getSelectionModel().getSelectedItem();
-        if (selectedTrack == null) {
-            if (statusLabel != null) {
-                statusLabel.setText("Select a track first.");
-            }
-            return;
-        }
-        searchYouTubeMusicForTrack(selectedTrack);
-    }
 
     private void openArtworkActionsForSelectedTrack() {
         if (trackTable == null) {
