@@ -843,30 +843,39 @@ public class SingSongArtworkUI extends Application {
         ContextMenu contextMenu = new ContextMenu();
         String contextMenuItemStyle = "-fx-font-size: 11px; -fx-padding: 4px 12px;";
 
+        // "Show Artwork" - Always visible
+        MenuItem showArtworkItem = new MenuItem("Show Artwork");
+        showArtworkItem.setStyle(contextMenuItemStyle);
+        showArtworkItem.setOnAction(e -> showArtworkForSelectedTrack());
+
+        // "Open YouTube" - Always visible
+        MenuItem openYouTubeItem = new MenuItem("Open YouTube");
+        openYouTubeItem.setStyle(contextMenuItemStyle);
+        openYouTubeItem.setOnAction(e -> openYouTubeForSelectedTrack());
+
+        // "Replace artwork" - Only visible in Admin mode
+        MenuItem replaceArtworkItem = new MenuItem("Replace artwork");
+        replaceArtworkItem.setStyle(contextMenuItemStyle);
+        replaceArtworkItem.setOnAction(e -> replaceArtworkForSelectedTracks());
+
+        contextMenu.getItems().add(showArtworkItem);
+        contextMenu.getItems().add(openYouTubeItem);
+
         if (adminMode) {
-            MenuItem artworkActionsItem = new MenuItem("Artwork actions...");
-            artworkActionsItem.setStyle(contextMenuItemStyle);
-            artworkActionsItem.setOnAction(e -> openArtworkActionsForSelectedTrack());
-
-            MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
-            copyFilenameItem.setStyle(contextMenuItemStyle);
-            copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
-
-            contextMenu.getItems().add(artworkActionsItem);
-            contextMenu.getItems().add(copyFilenameItem);
-        } else {
-            // User mode: only copy filename is available
-            MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
-            copyFilenameItem.setStyle(contextMenuItemStyle);
-            copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
-            contextMenu.getItems().add(copyFilenameItem);
+            contextMenu.getItems().add(replaceArtworkItem);
         }
+
+        // Copy filename always available
+        MenuItem copyFilenameItem = new MenuItem("Copy filename(s)");
+        copyFilenameItem.setStyle(contextMenuItemStyle);
+        copyFilenameItem.setOnAction(e -> copyFilenameToClipboard());
+        contextMenu.getItems().add(copyFilenameItem);
 
         return contextMenu;
     }
 
 
-    private void openArtworkActionsForSelectedTrack() {
+    private void showArtworkForSelectedTrack() {
         if (trackTable == null) {
             return;
         }
@@ -877,15 +886,21 @@ public class SingSongArtworkUI extends Application {
             }
             return;
         }
-        // Create a dummy cell to pass to handleArtworkDoubleClick
-        TableCell<TrackEntry, TrackEntry> dummyCell = new TableCell<TrackEntry, TrackEntry>() {
-            @Override
-            protected void updateItem(TrackEntry item, boolean empty) {
-                super.updateItem(item, empty);
+        showFullArtworkForTrack(selectedTrack);
+    }
+
+    private void openYouTubeForSelectedTrack() {
+        if (trackTable == null) {
+            return;
+        }
+        TrackEntry selectedTrack = trackTable.getSelectionModel().getSelectedItem();
+        if (selectedTrack == null) {
+            if (statusLabel != null) {
+                statusLabel.setText("Select a track first.");
             }
-        };
-        dummyCell.setText("-");
-        handleArtworkDoubleClick(selectedTrack, dummyCell);
+            return;
+        }
+        searchYouTubeForTrack(selectedTrack);
     }
 
     private void setChoicesForSelected(boolean chosen) {
@@ -1778,7 +1793,7 @@ public class SingSongArtworkUI extends Application {
             }
 
             {
-                // Handle double-click on artwork cell with role-aware actions.
+                // Handle double-click on artwork cell to show artwork only if present.
                 setPickOnBounds(true);
                 setOnMouseClicked(event -> {
                     if (event.getClickCount() != 2 || isEmpty()) {
@@ -1791,7 +1806,10 @@ public class SingSongArtworkUI extends Application {
                         return;
                     }
 
-                    handleArtworkDoubleClick(rowItem, this);
+                    // Only show artwork if it exists
+                    if (rowItem.hasArtwork()) {
+                        showFullArtworkForTrack(rowItem);
+                    }
                     event.consume();
                 });
             }
