@@ -154,6 +154,14 @@ public class DialogFactory {
         dialog.setTitle(title);
         dialog.setHeaderText(filename);
 
+        try {
+            dialog.getDialogPane().getStylesheets().add(
+                DialogFactory.class.getResource("/styles/modern-dark.css").toExternalForm()
+            );
+        } catch (Exception ex) {
+            // CSS not found, continue with default styling
+        }
+
         TextArea textArea = new TextArea(content);
         textArea.setEditable(false);
         textArea.setWrapText(true);
@@ -174,6 +182,14 @@ public class DialogFactory {
         dialog.setTitle("Application Log");
         dialog.setHeaderText("SingSongArtwork - Runtime Log");
 
+        try {
+            dialog.getDialogPane().getStylesheets().add(
+                DialogFactory.class.getResource("/styles/modern-dark.css").toExternalForm()
+            );
+        } catch (Exception ex) {
+            // CSS not found, continue with default styling
+        }
+
         TextArea textArea = new TextArea();
         textArea.setEditable(false);
         textArea.setWrapText(false);
@@ -193,6 +209,14 @@ public class DialogFactory {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Keyboard Shortcuts");
         alert.setHeaderText("SingSongArtwork - Keyboard Shortcuts");
+
+        try {
+            alert.getDialogPane().getStylesheets().add(
+                DialogFactory.class.getResource("/styles/modern-dark.css").toExternalForm()
+            );
+        } catch (Exception ex) {
+            // CSS not found, continue with default styling
+        }
 
         String shortcuts = """
                 File Operations:
@@ -245,6 +269,15 @@ public class DialogFactory {
             alert.setTitle("Artwork Preview");
             alert.setHeaderText(title);
             alert.setContentText("No artwork available for this track.");
+
+            try {
+                alert.getDialogPane().getStylesheets().add(
+                    DialogFactory.class.getResource("/styles/modern-dark.css").toExternalForm()
+                );
+            } catch (Exception ex) {
+                // CSS not found, continue with default styling
+            }
+
             alert.showAndWait();
             return;
         }
@@ -252,6 +285,14 @@ public class DialogFactory {
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Artwork Preview");
         dialog.setHeaderText(title);
+
+        try {
+            dialog.getDialogPane().getStylesheets().add(
+                DialogFactory.class.getResource("/styles/modern-dark.css").toExternalForm()
+            );
+        } catch (Exception ex) {
+            // CSS not found, continue with default styling
+        }
 
         try {
             Image image = new Image(new ByteArrayInputStream(artworkBytes));
@@ -286,6 +327,15 @@ public class DialogFactory {
             alert.setTitle("Artwork Preview");
             alert.setHeaderText(title);
             alert.setContentText("Could not display artwork: " + ex.getMessage());
+
+            try {
+                alert.getDialogPane().getStylesheets().add(
+                    DialogFactory.class.getResource("/styles/modern-dark.css").toExternalForm()
+                );
+            } catch (Exception cssEx) {
+                // CSS not found, continue with default styling
+            }
+
             alert.showAndWait();
         }
     }
