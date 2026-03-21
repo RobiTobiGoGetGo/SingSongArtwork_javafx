@@ -249,6 +249,38 @@ class SingSongArtworkUITest {
     }
 
     @Test
+    @DisplayName("User mode copy is blocked when the copy directory already contains files")
+    void testUserModeCopyBlockedWhenDirectoryHasFiles() throws IOException {
+        Path destinationDir = Files.createTempDirectory("singsongartwork-user-copy-block");
+        Files.createFile(destinationDir.resolve("existing.mp3"));
+
+        String message = SingSongArtworkUI.buildUserModeCopyBlockedMessage(false, destinationDir);
+
+        assertNotNull(message, "User mode should be blocked when destination already contains files");
+        assertTrue(message.contains("empty copy directory"));
+    }
+
+    @Test
+    @DisplayName("Admin mode copy is allowed even when the copy directory already contains files")
+    void testAdminModeCopyAllowedWhenDirectoryHasFiles() throws IOException {
+        Path destinationDir = Files.createTempDirectory("singsongartwork-admin-copy-allow");
+        Files.createFile(destinationDir.resolve("existing.mp3"));
+
+        assertNull(SingSongArtworkUI.buildUserModeCopyBlockedMessage(true, destinationDir),
+                "Admin mode should still allow copying into a non-empty destination");
+    }
+
+    @Test
+    @DisplayName("User mode copy is allowed when the copy directory is empty")
+    void testUserModeCopyAllowedWhenDirectoryIsEmpty() throws IOException {
+        Path destinationDir = Files.createTempDirectory("singsongartwork-user-copy-empty");
+
+        assertFalse(SingSongArtworkUI.copyDirectoryHasFiles(destinationDir));
+        assertNull(SingSongArtworkUI.buildUserModeCopyBlockedMessage(false, destinationDir),
+                "User mode should allow copying into an empty destination");
+    }
+
+    @Test
     @DisplayName("Copy choices overwrite warning lists collisions")
     void testBuildOverwriteWarningListsCollisions() throws Exception {
         Path destinationDir = Files.createTempDirectory("singsongartwork-dest");

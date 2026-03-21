@@ -1174,6 +1174,20 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
+        String userModeCopyBlockedMessage = buildUserModeCopyBlockedMessage(adminMode, copyDirectory);
+        if (userModeCopyBlockedMessage != null) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, userModeCopyBlockedMessage, ButtonType.OK);
+            alert.setTitle("Copy Blocked");
+            try {
+                alert.getDialogPane().getStylesheets().add(
+                    getClass().getResource("/styles/modern-dark.css").toExternalForm()
+                );
+            } catch (Exception ignore) {}
+            alert.showAndWait();
+            statusLabel.setText("Copy blocked: destination directory must be empty in User mode");
+            return;
+        }
+
         // Enforce max copy size limit
         int maxCopySizeMb = configManager.getMaxCopySizeMb();
         if (maxCopySizeMb != ConfigurationManager.NO_LIMIT) {
@@ -1225,6 +1239,25 @@ public class SingSongArtworkUI extends Application {
         // Open the destination folder after a successful copy.
         if (successCount > 0) {
             openDirectoryInExplorer(copyDirectory);
+        }
+    }
+
+    static String buildUserModeCopyBlockedMessage(boolean adminMode, Path copyDirectory) {
+        if (adminMode || !copyDirectoryHasFiles(copyDirectory)) {
+            return null;
+        }
+        return "In User mode, copying is only allowed to an empty copy directory.\n\n"
+                + "Please choose an empty copy directory, or switch to Admin mode.";
+    }
+
+    static boolean copyDirectoryHasFiles(Path copyDirectory) {
+        if (copyDirectory == null || !Files.isDirectory(copyDirectory)) {
+            return false;
+        }
+        try (var stream = Files.list(copyDirectory)) {
+            return stream.anyMatch(Files::isRegularFile);
+        } catch (IOException ex) {
+            return false;
         }
     }
 
