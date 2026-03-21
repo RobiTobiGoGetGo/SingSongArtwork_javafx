@@ -275,6 +275,9 @@ public class SingSongArtworkUI extends Application {
         // Initialize artwork directory label with the last used artwork directory path
         initializeLastArtworkDirectory();
 
+        // Show configured copy limits on screen
+        updateLimitsDisplay();
+
         // Properly terminate the application when the window is closed
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
@@ -390,6 +393,7 @@ public class SingSongArtworkUI extends Application {
                     }
                 }
             }
+            updateLimitsDisplay();
         }
     }
 
@@ -1745,6 +1749,15 @@ public class SingSongArtworkUI extends Application {
         moreColumnsMode = configManager.getColumnMode();
         // FAIL-SAFE: Always start in User mode, regardless of saved preference
         adminMode = false;
+    }
+
+    private void updateLimitsDisplay() {
+        if (filterPanelBuilder != null && configManager != null) {
+            filterPanelBuilder.setLimitsDisplay(
+                configManager.getMaxCopySizeMb(),
+                configManager.getMaxCopyCount()
+            );
+        }
     }
 
 

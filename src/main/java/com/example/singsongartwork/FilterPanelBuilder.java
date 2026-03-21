@@ -29,6 +29,7 @@ public class FilterPanelBuilder {
     private final Runnable onCopyChoices;
     private Button largeArtworkToggleBtn;
     private boolean largeArtworkMode = false;
+    private Label limitsLabel;
 
     private final java.util.function.Consumer<Boolean> onToggleLargeArtwork;
 
@@ -132,6 +133,16 @@ public class FilterPanelBuilder {
         );
 
         vbox.getChildren().add(filterBox);
+
+        // Limits display row
+        HBox limitsBox = new HBox(8);
+        limitsBox.setAlignment(Pos.CENTER_LEFT);
+        limitsBox.setPadding(new Insets(0, 0, 4, 2));
+        limitsLabel = new Label();
+        limitsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7ec8e3;");
+        limitsBox.getChildren().add(limitsLabel);
+        vbox.getChildren().add(limitsBox);
+
         return vbox;
     }
 
@@ -278,6 +289,14 @@ public class FilterPanelBuilder {
             largeArtworkMode = desired;
             updateLargeArtworkButton();
             onToggleLargeArtwork.accept(largeArtworkMode);
+        }
+    }
+
+    public void setLimitsDisplay(int maxMb, int maxCount) {
+        if (limitsLabel != null) {
+            String sizeStr = maxMb == -1 ? "no limit" : maxMb + " MB";
+            String countStr = maxCount == -1 ? "no limit" : String.valueOf(maxCount);
+            limitsLabel.setText("Copy limits:  size: " + sizeStr + "   count: " + countStr + " files");
         }
     }
 }
