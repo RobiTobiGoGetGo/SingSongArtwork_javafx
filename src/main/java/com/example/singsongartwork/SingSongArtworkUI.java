@@ -111,6 +111,28 @@ public class SingSongArtworkUI extends Application {
     private PlaybackBarBuilder playbackBarBuilder;
     private final StringBuilder appLogBuffer = new StringBuilder();
 
+    static final class ChoiceUpdateResult {
+        private final int added;
+        private final int removed;
+        private final int blocked;
+
+        ChoiceUpdateResult(int added, int removed, int blocked) {
+            this.added = added;
+            this.removed = removed;
+            this.blocked = blocked;
+        }
+
+        int getAdded() { return added; }
+        int getRemoved() { return removed; }
+        int getBlocked() { return blocked; }
+    }
+
+    enum ChoiceUpdateMode {
+        MARK,
+        UNMARK,
+        TOGGLE
+    }
+
     @Override
     public void start(Stage primaryStage) {
         service = new Mp3MetadataService();
@@ -190,7 +212,7 @@ public class SingSongArtworkUI extends Application {
 
         // Center: table
         tableBuilder = new TrackTableBuilder(
-                () -> new byte[0],  // Artwork bytes will be handled per-item in cell factory
+                () -> new byte[0],
                 this::onTransportClicked,
                 ignored -> {
                     if (showChoicesOnly) {
@@ -199,7 +221,9 @@ public class SingSongArtworkUI extends Application {
                     updateSelectionStatus();
                 },
                 this::isMediaPlaying,
-                choicesTrackPaths
+                choicesTrackPaths,
+                this::applyChoiceUpdateToTracks,
+                this::toggleChoicesForTracks
         );
         trackTable = tableBuilder.buildTable();
         // Replace artwork column with UI version that handles caching and lazy-loading
@@ -678,20 +702,7 @@ public class SingSongArtworkUI extends Application {
                 event.consume();
                 ObservableList<TrackEntry> selectedItems = table.getSelectionModel().getSelectedItems();
                 if (selectedItems != null && !selectedItems.isEmpty()) {
-                    // Toggle choices for all selected rows
-                    for (TrackEntry track : new ArrayList<>(selectedItems)) {
-                        boolean isCurrentlyChosen = choicesTrackPaths.contains(track.getFilePath());
-                        if (isCurrentlyChosen) {
-                            choicesTrackPaths.remove(track.getFilePath());
-                        } else {
-                            choicesTrackPaths.add(track.getFilePath());
-                        }
-                    }
-                    if (showChoicesOnly) {
-                        applyFilter();
-                    }
-                    table.refresh();
-                    updateSelectionStatus();
+                    toggleChoicesForTracks(new ArrayList<>(selectedItems));
                 }
             }
         });
@@ -997,6 +1008,133 @@ public class SingSongArtworkUI extends Application {
         searchYouTubeForTrack(selectedTrack);
     }
 
+    static ChoiceUpdateResult applyChoiceUpdate(Set<Path> currentChoices, List<Path> targetPaths, ChoiceUpdateMode mode, int maxCopyCount) {
+        java.util.LinkedHashSet<Path> uniqueTargets = new java.util.LinkedHashSet<>();
+        for (Path path : targetPaths) {
+            if (path != null) {
+                uniqueTargets.add(path);
+            }
+        }
+
+        int added = 0;
+        int removed = 0;
+        int blocked = 0;
+
+        if (mode == ChoiceUpdateMode.UNMARK) {
+            for (Path path : uniqueTargets) {
+                if (currentChoices.remove(path)) {
+                    removed++;
+                }
+            }
+            return new ChoiceUpdateResult(added, removed, blocked);
+        }
+
+        List<Path> pendingAdds = new ArrayList<>();
+        for (Path path : uniqueTargets) {
+            if (currentChoices.contains(path)) {
+                if (mode == ChoiceUpdateMode.TOGGLE && currentChoices.remove(path)) {
+                    removed++;
+                }
+            } else {
+                pendingAdds.add(path);
+            }
+        }
+
+        for (Path path : pendingAdds) {
+            if (maxCopyCount == ConfigurationManager.NO_LIMIT || currentChoices.size() < maxCopyCount) {
+                if (currentChoices.add(path)) {
+                    added++;
+                }
+            } else {
+                blocked++;
+            }
+        }
+
+        return new ChoiceUpdateResult(added, removed, blocked);
+    }
+
+    private void applyChoiceUpdateToTracks(List<TrackEntry> tracks, boolean chosen) {
+        applyChoiceUpdateToTracks(tracks, chosen ? ChoiceUpdateMode.MARK : ChoiceUpdateMode.UNMARK);
+    }
+
+    private void toggleChoicesForTracks(List<TrackEntry> tracks) {
+        applyChoiceUpdateToTracks(tracks, ChoiceUpdateMode.TOGGLE);
+    }
+
+    private void applyChoiceUpdateToTracks(List<TrackEntry> tracks, ChoiceUpdateMode mode) {
+        if (tracks == null || tracks.isEmpty()) {
+            if (statusLabel != null) {
+                statusLabel.setText("No selected tracks to " + switch (mode) {
+                    case MARK -> "mark";
+                    case UNMARK -> "clear";
+                    case TOGGLE -> "toggle";
+                });
+            }
+            return;
+        }
+
+        List<Path> targetPaths = tracks.stream().map(TrackEntry::getFilePath).toList();
+        int maxCopyCount = configManager == null ? ConfigurationManager.NO_LIMIT : configManager.getMaxCopyCount();
+        ChoiceUpdateResult result = applyChoiceUpdate(choicesTrackPaths, targetPaths, mode, maxCopyCount);
+
+        if (showChoicesOnly) {
+            applyFilter();
+        }
+        if (trackTable != null) {
+            trackTable.refresh();
+        }
+        updateSelectionStatus();
+        updateChoiceStatusMessage(mode, result, maxCopyCount);
+    }
+
+    private void updateChoiceStatusMessage(ChoiceUpdateMode mode, ChoiceUpdateResult result, int maxCopyCount) {
+        if (statusLabel == null) {
+            return;
+        }
+
+        String baseMessage = switch (mode) {
+            case MARK -> result.getAdded() > 0
+                    ? "Marked " + result.getAdded() + " track" + (result.getAdded() == 1 ? "" : "s")
+                    : "No new tracks were marked";
+            case UNMARK -> result.getRemoved() > 0
+                    ? "Unmarked " + result.getRemoved() + " track" + (result.getRemoved() == 1 ? "" : "s")
+                    : "No marked tracks were cleared";
+            case TOGGLE -> {
+                List<String> parts = new ArrayList<>();
+                if (result.getAdded() > 0) {
+                    parts.add("added " + result.getAdded());
+                }
+                if (result.getRemoved() > 0) {
+                    parts.add("removed " + result.getRemoved());
+                }
+                yield parts.isEmpty() ? "No choices changed" : "Choices updated: " + String.join(", ", parts);
+            }
+        };
+
+        if (result.getBlocked() > 0 && maxCopyCount != ConfigurationManager.NO_LIMIT) {
+            baseMessage += "; " + result.getBlocked() + " blocked by choice limit of " + maxCopyCount;
+        }
+
+        statusLabel.setText(baseMessage);
+    }
+
+    static String buildCopyLimitExceededMessage(int selectedCount, double totalMb, int maxCopyCount, int maxCopySizeMb) {
+        List<String> exceededLimits = new ArrayList<>();
+        if (maxCopyCount != ConfigurationManager.NO_LIMIT && selectedCount > maxCopyCount) {
+            exceededLimits.add(String.format("- Count: %d files selected, limit is %d files.", selectedCount, maxCopyCount));
+        }
+        if (maxCopySizeMb != ConfigurationManager.NO_LIMIT && totalMb > maxCopySizeMb) {
+            exceededLimits.add(String.format("- Size: %.1f MB selected, limit is %d MB.", totalMb, maxCopySizeMb));
+        }
+        if (exceededLimits.isEmpty()) {
+            return null;
+        }
+
+        return "The selected choices exceed the configured copy limit(s):\n\n"
+                + String.join("\n", exceededLimits)
+                + "\n\nPlease reduce the selection, or ask an Admin to adjust Options -> Copy Limits.";
+    }
+
     private void setChoicesForSelected(boolean chosen) {
         ObservableList<TrackEntry> selectedTracks = trackTable.getSelectionModel().getSelectedItems();
         if (selectedTracks == null || selectedTracks.isEmpty()) {
@@ -1004,20 +1142,7 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
-        for (TrackEntry track : selectedTracks) {
-            if (chosen) {
-                choicesTrackPaths.add(track.getFilePath());
-            } else {
-                choicesTrackPaths.remove(track.getFilePath());
-            }
-        }
-
-        if (showChoicesOnly) {
-            applyFilter();
-        }
-        trackTable.refresh();
-        updateSelectionStatus();
-        statusLabel.setText((chosen ? "Marked " : "Unmarked ") + selectedTracks.size() + " tracks");
+        applyChoiceUpdateToTracks(new ArrayList<>(selectedTracks), chosen);
     }
 
     private void clearChoicesTracks() {

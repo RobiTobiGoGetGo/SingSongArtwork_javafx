@@ -16,11 +16,14 @@ public class ConfigurationManager {
     private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
     private static final String KEY_UI_ROLE = "ui.role";
     private static final String KEY_MAX_COPY_SIZE_MB = "max.copy.size.mb";
+    private static final String KEY_MAX_COPY_COUNT = "max.copy.count";
 
     /** Sentinel value meaning "no limit". */
     public static final int NO_LIMIT = -1;
     /** Default maximum total size (in MB) of choices that can be copied at once. */
-    public static final int DEFAULT_MAX_COPY_SIZE_MB = 500;
+    public static final int DEFAULT_MAX_COPY_SIZE_MB = 700;
+    /** Default maximum number of chosen files that can be copied at once. */
+    public static final int DEFAULT_MAX_COPY_COUNT = 31;
 
     private final Path configFile;
 
@@ -200,10 +203,7 @@ public class ConfigurationManager {
         try {
             if (Files.exists(configFile)) {
                 Properties props = loadProperties();
-                String raw = props.getProperty(KEY_MAX_COPY_SIZE_MB);
-                if (raw != null && !raw.isBlank()) {
-                    return Integer.parseInt(raw.trim());
-                }
+                return normalizeLimitValue(props.getProperty(KEY_MAX_COPY_SIZE_MB), DEFAULT_MAX_COPY_SIZE_MB);
             }
         } catch (Exception ex) {
             // Silently ignore
@@ -224,6 +224,52 @@ public class ConfigurationManager {
         } catch (IOException ex) {
             System.err.println("Warning: Could not save max copy size preference: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Get the maximum number of chosen files allowed in a copy operation.
+     * Returns {@link #NO_LIMIT} (-1) if there is no limit.
+     */
+    public int getMaxCopyCount() {
+        try {
+            if (Files.exists(configFile)) {
+                Properties props = loadProperties();
+                return normalizeLimitValue(props.getProperty(KEY_MAX_COPY_COUNT), DEFAULT_MAX_COPY_COUNT);
+            }
+        } catch (Exception ex) {
+            // Silently ignore
+        }
+        return DEFAULT_MAX_COPY_COUNT;
+    }
+
+    /**
+     * Save the maximum copy count setting.
+     * Pass {@link #NO_LIMIT} (-1) to disable the limit.
+     */
+    public void saveMaxCopyCount(int count) {
+        try {
+            ensureConfigDirectory();
+            Properties props = loadProperties();
+            props.setProperty(KEY_MAX_COPY_COUNT, String.valueOf(count));
+            saveProperties(props);
+        } catch (IOException ex) {
+            System.err.println("Warning: Could not save max copy count preference: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Normalize a limit value from the config, ensuring it is positive or NO_LIMIT.
+     */
+    private int normalizeLimitValue(String rawValue, int defaultValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return defaultValue;
+        }
+
+        int parsed = Integer.parseInt(rawValue.trim());
+        if (parsed == 0 || parsed == NO_LIMIT) {
+            return NO_LIMIT;
+        }
+        return parsed > 0 ? parsed : defaultValue;
     }
 
     /**
@@ -258,4 +304,3 @@ public class ConfigurationManager {
         }
     }
 }
-

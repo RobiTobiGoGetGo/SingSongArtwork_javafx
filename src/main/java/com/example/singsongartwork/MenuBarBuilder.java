@@ -36,7 +36,7 @@ public class MenuBarBuilder {
     private final Runnable onClearChoices;
     private final java.util.function.Consumer<Integer> onColumnModeChanged;
     private final java.util.function.Consumer<Boolean> onRoleChanged;
-    private final Runnable onConfigureMaxMp3LoadSize;
+    private final Runnable onConfigureCopyLimits;
 
     public MenuBarBuilder(
             Runnable onShowAppLog,
@@ -52,7 +52,7 @@ public class MenuBarBuilder {
             Runnable onClearChoices,
             java.util.function.Consumer<Integer> onColumnModeChanged,
             java.util.function.Consumer<Boolean> onRoleChanged,
-            Runnable onConfigureMaxMp3LoadSize) {
+            Runnable onConfigureCopyLimits) {
         this.onShowAppLog = onShowAppLog;
         this.onShowReadme = onShowReadme;
         this.onShowLicense = onShowLicense;
@@ -66,7 +66,7 @@ public class MenuBarBuilder {
         this.onClearChoices = onClearChoices;
         this.onColumnModeChanged = onColumnModeChanged;
         this.onRoleChanged = onRoleChanged;
-        this.onConfigureMaxMp3LoadSize = onConfigureMaxMp3LoadSize;
+        this.onConfigureCopyLimits = onConfigureCopyLimits;
     }
 
     /**
@@ -299,10 +299,10 @@ public class MenuBarBuilder {
 
             optionsMenu.getItems().add(new SeparatorMenuItem());
 
-            MenuItem maxSizeItem = new MenuItem("Max Copy Size...");
-            maxSizeItem.setStyle(menuItemStyle);
-            maxSizeItem.setOnAction(e -> onConfigureMaxMp3LoadSize.run());
-            optionsMenu.getItems().add(maxSizeItem);
+            MenuItem copyLimitsItem = new MenuItem("Copy Limits...");
+            copyLimitsItem.setStyle(menuItemStyle);
+            copyLimitsItem.setOnAction(e -> onConfigureCopyLimits.run());
+            optionsMenu.getItems().add(copyLimitsItem);
         }
     }
 

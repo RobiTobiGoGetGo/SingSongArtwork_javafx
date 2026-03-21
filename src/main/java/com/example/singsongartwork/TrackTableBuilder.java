@@ -32,18 +32,24 @@ public class TrackTableBuilder {
     private final java.util.function.Consumer<Set<Path>> onChoicesChanged;
     private final java.util.function.Supplier<Boolean> isPlayingSupplier;
     private final Set<Path> choicesTrackPaths;
+    private final java.util.function.BiConsumer<java.util.List<TrackEntry>, Boolean> onSetChoicesRequested;
+    private final java.util.function.Consumer<java.util.List<TrackEntry>> onToggleChoicesRequested;
 
     public TrackTableBuilder(
             java.util.function.Supplier<byte[]> artworkLoader,
             java.util.function.Consumer<TrackEntry> onPlayClicked,
             java.util.function.Consumer<Set<Path>> onChoicesChanged,
             java.util.function.Supplier<Boolean> isPlayingSupplier,
-            Set<Path> choicesTrackPaths) {
+            Set<Path> choicesTrackPaths,
+            java.util.function.BiConsumer<java.util.List<TrackEntry>, Boolean> onSetChoicesRequested,
+            java.util.function.Consumer<java.util.List<TrackEntry>> onToggleChoicesRequested) {
         this.artworkLoader = artworkLoader;
         this.onPlayClicked = onPlayClicked;
         this.onChoicesChanged = onChoicesChanged;
         this.isPlayingSupplier = isPlayingSupplier;
         this.choicesTrackPaths = choicesTrackPaths;
+        this.onSetChoicesRequested = onSetChoicesRequested;
+        this.onToggleChoicesRequested = onToggleChoicesRequested;
     }
 
     /**
@@ -78,14 +84,7 @@ public class TrackTableBuilder {
                 event.consume();
                 ObservableList<TrackEntry> selectedItems = table.getSelectionModel().getSelectedItems();
                 if (selectedItems != null && !selectedItems.isEmpty()) {
-                    for (TrackEntry track : new ArrayList<>(selectedItems)) {
-                        boolean isCurrentlyChosen = choicesTrackPaths.contains(track.getFilePath());
-                        if (isCurrentlyChosen) {
-                            choicesTrackPaths.remove(track.getFilePath());
-                        } else {
-                            choicesTrackPaths.add(track.getFilePath());
-                        }
-                    }
+                    onToggleChoicesRequested.accept(new ArrayList<>(selectedItems));
                     table.refresh();
                     onChoicesChanged.accept(choicesTrackPaths);
                 }
@@ -235,11 +234,7 @@ public class TrackTableBuilder {
                     if (track == null) {
                         return;
                     }
-                    if (checkBox.isSelected()) {
-                        choicesTrackPaths.add(track.getFilePath());
-                    } else {
-                        choicesTrackPaths.remove(track.getFilePath());
-                    }
+                    onSetChoicesRequested.accept(java.util.List.of(track), checkBox.isSelected());
                     onChoicesChanged.accept(choicesTrackPaths);
                     if (table != null) {
                         table.refresh();

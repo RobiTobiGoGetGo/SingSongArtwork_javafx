@@ -1,19 +1,15 @@
 package com.example.singsongartwork;
 
 import javafx.application.Platform;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.MenuButton;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.CheckMenuItem;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-
+import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
@@ -295,6 +291,131 @@ class SingSongArtworkUITest {
     }
 
     @Test
+    @DisplayName("Copy limit check allows selections exactly at both limits")
+    void testCopyLimitCheckAllowsExactLimit() {
+        int defaultCountLimit = ConfigurationManager.DEFAULT_MAX_COPY_COUNT;
+        String message = SingSongArtworkUI.buildCopyLimitExceededMessage(defaultCountLimit, 700.0, defaultCountLimit, 700);
+        assertNull(message, "Selections exactly at the configured limits should be allowed");
+    }
+
+    @Test
+    @DisplayName("Copy limit check blocks on count or size and the lower effective limit wins")
+    void testCopyLimitCheckBlocksWhenEitherLimitExceeded() {
+        int defaultCountLimit = ConfigurationManager.DEFAULT_MAX_COPY_COUNT;
+
+        String countOnly = SingSongArtworkUI.buildCopyLimitExceededMessage(defaultCountLimit + 1, 650.0, defaultCountLimit, 700);
+        assertNotNull(countOnly, "Copy should be blocked when count exceeds the limit");
+        assertTrue(countOnly.contains("Count: " + (defaultCountLimit + 1) + " files selected, limit is " + defaultCountLimit + " files."));
+
+        String sizeOnly = SingSongArtworkUI.buildCopyLimitExceededMessage(defaultCountLimit - 1, 701.0, defaultCountLimit, 700);
+        assertNotNull(sizeOnly, "Copy should be blocked when size exceeds the limit");
+        assertTrue(sizeOnly.contains("Size: 701.0 MB selected, limit is 700 MB."));
+
+        String bothExceeded = SingSongArtworkUI.buildCopyLimitExceededMessage(defaultCountLimit + 1, 701.0, defaultCountLimit, 700);
+        assertNotNull(bothExceeded, "Copy should be blocked when both limits are exceeded");
+        assertTrue(bothExceeded.contains("Count: " + (defaultCountLimit + 1) + " files selected, limit is " + defaultCountLimit + " files."));
+        assertTrue(bothExceeded.contains("Size: 701.0 MB selected, limit is 700 MB."));
+    }
+
+    @Test
+    @DisplayName("Copy limit check ignores disabled limits")
+    void testCopyLimitCheckIgnoresNoLimitSettings() {
+        int defaultCountLimit = ConfigurationManager.DEFAULT_MAX_COPY_COUNT;
+        assertNull(SingSongArtworkUI.buildCopyLimitExceededMessage(500, 5000.0,
+                ConfigurationManager.NO_LIMIT, ConfigurationManager.NO_LIMIT));
+        assertNull(SingSongArtworkUI.buildCopyLimitExceededMessage(500, 650.0,
+                ConfigurationManager.NO_LIMIT, 700));
+        assertNull(SingSongArtworkUI.buildCopyLimitExceededMessage(defaultCountLimit - 1, 5000.0,
+                defaultCountLimit, ConfigurationManager.NO_LIMIT));
+    }
+
+    @Test
+    @DisplayName("Choice update marks up to the configured count limit and blocks the rest")
+    void testChoiceUpdateRespectsCountLimitWhenMarking() {
+        Set<Path> choices = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        List<Path> targets = java.util.stream.IntStream.range(0, ConfigurationManager.DEFAULT_MAX_COPY_COUNT + 2)
+                .mapToObj(i -> Path.of("song-" + i + ".mp3"))
+                .toList();
+
+        SingSongArtworkUI.ChoiceUpdateResult result = SingSongArtworkUI.applyChoiceUpdate(
+                choices,
+                targets,
+                SingSongArtworkUI.ChoiceUpdateMode.MARK,
+                ConfigurationManager.DEFAULT_MAX_COPY_COUNT
+        );
+
+        assertEquals(ConfigurationManager.DEFAULT_MAX_COPY_COUNT, result.getAdded());
+        assertEquals(0, result.getRemoved());
+        assertEquals(2, result.getBlocked());
+        assertEquals(ConfigurationManager.DEFAULT_MAX_COPY_COUNT, choices.size());
+    }
+
+    @Test
+    @DisplayName("Choice update allows exact count limit without blocking")
+    void testChoiceUpdateAllowsExactCountLimit() {
+        Set<Path> choices = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        List<Path> targets = java.util.stream.IntStream.range(0, ConfigurationManager.DEFAULT_MAX_COPY_COUNT)
+                .mapToObj(i -> Path.of("song-" + i + ".mp3"))
+                .toList();
+
+        SingSongArtworkUI.ChoiceUpdateResult result = SingSongArtworkUI.applyChoiceUpdate(
+                choices,
+                targets,
+                SingSongArtworkUI.ChoiceUpdateMode.MARK,
+                ConfigurationManager.DEFAULT_MAX_COPY_COUNT
+        );
+
+        assertEquals(ConfigurationManager.DEFAULT_MAX_COPY_COUNT, result.getAdded());
+        assertEquals(0, result.getBlocked());
+        assertEquals(ConfigurationManager.DEFAULT_MAX_COPY_COUNT, choices.size());
+    }
+
+    @Test
+    @DisplayName("Choice update toggle frees space before adding new choices")
+    void testChoiceUpdateToggleRemovesThenAddsWithinLimit() {
+        Set<Path> choices = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        Path existingA = Path.of("existing-a.mp3");
+        Path existingB = Path.of("existing-b.mp3");
+        choices.add(existingA);
+        choices.add(existingB);
+
+        SingSongArtworkUI.ChoiceUpdateResult result = SingSongArtworkUI.applyChoiceUpdate(
+                choices,
+                List.of(existingA, Path.of("new-a.mp3"), Path.of("new-b.mp3")),
+                SingSongArtworkUI.ChoiceUpdateMode.TOGGLE,
+                3
+        );
+
+        assertEquals(2, result.getAdded());
+        assertEquals(1, result.getRemoved());
+        assertEquals(0, result.getBlocked());
+        assertFalse(choices.contains(existingA));
+        assertTrue(choices.contains(existingB));
+        assertTrue(choices.contains(Path.of("new-a.mp3")));
+        assertTrue(choices.contains(Path.of("new-b.mp3")));
+    }
+
+    @Test
+    @DisplayName("Choice update ignores count cap when no limit is configured")
+    void testChoiceUpdateIgnoresCountCapInNoLimitMode() {
+        Set<Path> choices = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        List<Path> targets = java.util.stream.IntStream.range(0, ConfigurationManager.DEFAULT_MAX_COPY_COUNT + 20)
+                .mapToObj(i -> Path.of("song-" + i + ".mp3"))
+                .toList();
+
+        SingSongArtworkUI.ChoiceUpdateResult result = SingSongArtworkUI.applyChoiceUpdate(
+                choices,
+                targets,
+                SingSongArtworkUI.ChoiceUpdateMode.MARK,
+                ConfigurationManager.NO_LIMIT
+        );
+
+        assertEquals(targets.size(), result.getAdded());
+        assertEquals(0, result.getBlocked());
+        assertEquals(targets.size(), choices.size());
+    }
+
+    @Test
     @DisplayName("Space-toggle behavior flips choices for all selected rows")
     void testSpaceToggleBehaviorForSelectedRows() {
         Set<Path> choices = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -342,4 +463,3 @@ class SingSongArtworkUITest {
         }
     }
 }
-
