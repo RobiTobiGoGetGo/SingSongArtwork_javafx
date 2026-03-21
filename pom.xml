@@ -5,7 +5,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>SingSongArtwork_javafx</artifactId>
-    <version>0.40.2</version>
+    <version>0.40.3</version>
     <name>SingSongArtwork_javafx</name>
 
     <properties>

@@ -249,6 +249,51 @@ class SingSongArtworkUITest {
     }
 
     @Test
+    @DisplayName("Copy directory is blocked when it matches the music directory")
+    void testCopyDirectoryBlockedWhenMatchingMusicDirectory() throws IOException {
+        Path musicDir = Files.createTempDirectory("singsongartwork-music-dir");
+        Path artworkDir = Files.createTempDirectory("singsongartwork-artwork-dir");
+
+        String message = SingSongArtworkUI.buildInvalidCopyDirectoryMessage(musicDir, musicDir, artworkDir);
+
+        assertNotNull(message);
+        assertTrue(message.contains("music directory"));
+    }
+
+    @Test
+    @DisplayName("Copy directory is blocked when it matches the artwork directory")
+    void testCopyDirectoryBlockedWhenMatchingArtworkDirectory() throws IOException {
+        Path musicDir = Files.createTempDirectory("singsongartwork-music-dir");
+        Path artworkDir = Files.createTempDirectory("singsongartwork-artwork-dir");
+
+        String message = SingSongArtworkUI.buildInvalidCopyDirectoryMessage(artworkDir, musicDir, artworkDir);
+
+        assertNotNull(message);
+        assertTrue(message.contains("artwork directory"));
+    }
+
+    @Test
+    @DisplayName("Copy directory is blocked when music and artwork directories are both the same as copy")
+    void testCopyDirectoryBlockedWhenMatchingMusicAndArtworkDirectory() throws IOException {
+        Path sharedDir = Files.createTempDirectory("singsongartwork-shared-dir");
+
+        String message = SingSongArtworkUI.buildInvalidCopyDirectoryMessage(sharedDir, sharedDir, sharedDir);
+
+        assertNotNull(message);
+        assertTrue(message.contains("both the music directory and the artwork directory"));
+    }
+
+    @Test
+    @DisplayName("Copy directory is allowed when it differs from music and artwork directories")
+    void testCopyDirectoryAllowedWhenDistinct() throws IOException {
+        Path copyDir = Files.createTempDirectory("singsongartwork-copy-dir");
+        Path musicDir = Files.createTempDirectory("singsongartwork-music-dir");
+        Path artworkDir = Files.createTempDirectory("singsongartwork-artwork-dir");
+
+        assertNull(SingSongArtworkUI.buildInvalidCopyDirectoryMessage(copyDir, musicDir, artworkDir));
+    }
+
+    @Test
     @DisplayName("User mode copy is blocked when the copy directory already contains files")
     void testUserModeCopyBlockedWhenDirectoryHasFiles() throws IOException {
         Path destinationDir = Files.createTempDirectory("singsongartwork-user-copy-block");
@@ -464,6 +509,62 @@ class SingSongArtworkUITest {
         toggleChoicesForSelectedRows(choices, selected);
         assertFalse(choices.contains(t1.getFilePath()));
         assertFalse(choices.contains(t2.getFilePath()));
+    }
+
+    @Test
+    @DisplayName("Music directory is blocked when it matches the copy directory")
+    void testMusicDirectoryBlockedWhenMatchingCopyDirectory() throws IOException {
+        Path musicDir = Files.createTempDirectory("singsongartwork-music-dir");
+        Path artworkDir = Files.createTempDirectory("singsongartwork-artwork-dir");
+
+        String message = SingSongArtworkUI.buildDirectoryConflictMessage(
+                "music",
+                musicDir,
+                "copy",
+                musicDir,
+                "artwork",
+                artworkDir
+        );
+
+        assertNotNull(message);
+        assertTrue(message.contains("copy directory"));
+    }
+
+    @Test
+    @DisplayName("Artwork directory is blocked when it matches the copy directory")
+    void testArtworkDirectoryBlockedWhenMatchingCopyDirectory() throws IOException {
+        Path musicDir = Files.createTempDirectory("singsongartwork-music-dir");
+        Path artworkDir = Files.createTempDirectory("singsongartwork-artwork-dir");
+
+        String message = SingSongArtworkUI.buildDirectoryConflictMessage(
+                "artwork",
+                artworkDir,
+                "music",
+                musicDir,
+                "copy",
+                artworkDir
+        );
+
+        assertNotNull(message);
+        assertTrue(message.contains("copy directory"));
+    }
+
+    @Test
+    @DisplayName("Music directory is blocked when it matches both copy and artwork directories")
+    void testMusicDirectoryBlockedWhenMatchingCopyAndArtworkDirectories() throws IOException {
+        Path sharedDir = Files.createTempDirectory("singsongartwork-shared-dir");
+
+        String message = SingSongArtworkUI.buildDirectoryConflictMessage(
+                "music",
+                sharedDir,
+                "copy",
+                sharedDir,
+                "artwork",
+                sharedDir
+        );
+
+        assertNotNull(message);
+        assertTrue(message.contains("both the copy directory and the artwork directory"));
     }
 
     // Helper method to simulate filter application

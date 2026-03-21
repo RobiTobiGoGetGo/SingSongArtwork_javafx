@@ -665,14 +665,29 @@ public class SingSongArtworkUI extends Application {
         }
         File selected = chooser.showDialog(null);
         if (selected != null) {
+            Path musicDirectory = selected.toPath();
+            String invalidMusicDirectoryMessage = buildDirectoryConflictMessage(
+                    "music",
+                    musicDirectory,
+                    "copy",
+                    getLastCopyDirectory(),
+                    "artwork",
+                    getLastArtworkDirectory()
+            );
+            if (invalidMusicDirectoryMessage != null) {
+                showStyledErrorAlert("Music Directory Not Allowed", invalidMusicDirectoryMessage);
+                statusLabel.setText("Music directory must be different from copy and artwork directories");
+                return;
+            }
+
             // Show preview of MP3 files in the directory
-            if (showDirectoryPreview(selected.toPath())) {
-                currentDirectory = selected.toPath();
+            if (showDirectoryPreview(musicDirectory)) {
+                currentDirectory = musicDirectory;
                 if (menuBarBuilder != null) {
                     menuBarBuilder.setMusicDirectory(selected.getAbsolutePath());
                 }
-                saveLastMusicDirectory(selected.toPath());
-                loadTracks(selected.toPath());
+                saveLastMusicDirectory(musicDirectory);
+                loadTracks(musicDirectory);
             }
         }
     }
@@ -1174,6 +1189,13 @@ public class SingSongArtworkUI extends Application {
             return;
         }
 
+        String invalidCopyDirectoryMessage = buildInvalidCopyDirectoryMessage(copyDirectory, currentDirectory, getLastArtworkDirectory());
+        if (invalidCopyDirectoryMessage != null) {
+            showStyledErrorAlert("Copy Directory Not Allowed", invalidCopyDirectoryMessage);
+            statusLabel.setText("Copy blocked: copy directory must be different from music and artwork directories");
+            return;
+        }
+
         String userModeCopyBlockedMessage = buildUserModeCopyBlockedMessage(adminMode, copyDirectory);
         if (userModeCopyBlockedMessage != null) {
             Alert alert = new Alert(Alert.AlertType.ERROR, userModeCopyBlockedMessage, ButtonType.OK);
@@ -1250,6 +1272,46 @@ public class SingSongArtworkUI extends Application {
                 + "Please choose an empty copy directory, or switch to Admin mode.";
     }
 
+    static String buildInvalidCopyDirectoryMessage(Path copyDirectory, Path musicDirectory, Path artworkDirectory) {
+        return buildDirectoryConflictMessage(
+                "copy",
+                copyDirectory,
+                "music",
+                musicDirectory,
+                "artwork",
+                artworkDirectory
+        );
+    }
+
+    static String buildDirectoryConflictMessage(
+            String selectedRole,
+            Path selectedDirectory,
+            String otherRoleOne,
+            Path otherDirectoryOne,
+            String otherRoleTwo,
+            Path otherDirectoryTwo) {
+        boolean sameAsOtherOne = isSameDirectory(selectedDirectory, otherDirectoryOne);
+        boolean sameAsOtherTwo = isSameDirectory(selectedDirectory, otherDirectoryTwo);
+        if (!sameAsOtherOne && !sameAsOtherTwo) {
+            return null;
+        }
+        if (sameAsOtherOne && sameAsOtherTwo) {
+            return "The " + selectedRole + " directory must be different from both the "
+                    + otherRoleOne + " directory and the " + otherRoleTwo + " directory.";
+        }
+        if (sameAsOtherOne) {
+            return "The " + selectedRole + " directory must be different from the " + otherRoleOne + " directory.";
+        }
+        return "The " + selectedRole + " directory must be different from the " + otherRoleTwo + " directory.";
+    }
+
+    static boolean isSameDirectory(Path firstDirectory, Path secondDirectory) {
+        if (firstDirectory == null || secondDirectory == null) {
+            return false;
+        }
+        return firstDirectory.toAbsolutePath().normalize().equals(secondDirectory.toAbsolutePath().normalize());
+    }
+
     static boolean copyDirectoryHasFiles(Path copyDirectory) {
         if (copyDirectory == null || !Files.isDirectory(copyDirectory)) {
             return false;
@@ -1313,18 +1375,15 @@ public class SingSongArtworkUI extends Application {
     private void openDirectoryInExplorer(Path directory) {
         try {
             if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                // Use Windows Explorer to open the directory
                 ProcessBuilder pb = new ProcessBuilder("explorer.exe", directory.toAbsolutePath().toString());
                 pb.start();
                 System.out.println("[DEBUG] Opened directory in Windows Explorer: " + directory.toAbsolutePath());
             } else {
-                // For other operating systems, try to open with default file manager
                 Desktop.getDesktop().open(directory.toFile());
                 System.out.println("[DEBUG] Opened directory in default file manager: " + directory.toAbsolutePath());
             }
         } catch (Exception ex) {
             System.err.println("[ERROR] Failed to open directory: " + ex.getMessage());
-            // Don't show error to user - the copy was already successful
         }
     }
 
@@ -1359,7 +1418,6 @@ public class SingSongArtworkUI extends Application {
             helpMenu.getItems().add(licenseItem);
 
             if (adminMode) {
-                // Add shortcuts item in Admin mode
                 MenuItem shortcutsItem = new MenuItem("Keyboard Shortcuts...");
                 shortcutsItem.setStyle("-fx-font-size: 11px; -fx-padding: 4px 12px;");
                 shortcutsItem.setOnAction(e -> showKeyboardShortcuts());
@@ -1369,6 +1427,16 @@ public class SingSongArtworkUI extends Application {
         }
     }
 
+    private void showStyledErrorAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        alert.setTitle(title);
+        try {
+            alert.getDialogPane().getStylesheets().add(
+                getClass().getResource("/styles/modern-dark.css").toExternalForm()
+            );
+        } catch (Exception ignore) {}
+        alert.showAndWait();
+    }
 
     private void chooseCopyDirectory() {
         DirectoryChooser chooser = new DirectoryChooser();
@@ -1389,6 +1457,13 @@ public class SingSongArtworkUI extends Application {
         }
 
         Path copyDirectory = selected.toPath();
+        String invalidCopyDirectoryMessage = buildInvalidCopyDirectoryMessage(copyDirectory, currentDirectory, getLastArtworkDirectory());
+        if (invalidCopyDirectoryMessage != null) {
+            showStyledErrorAlert("Copy Directory Not Allowed", invalidCopyDirectoryMessage);
+            statusLabel.setText("Copy directory must be different from music and artwork directories");
+            return;
+        }
+
         saveLastCopyDirectory(copyDirectory);
 
         // Update the copy directory in the three-dot menu
@@ -1418,6 +1493,20 @@ public class SingSongArtworkUI extends Application {
         }
 
         Path artworkDirectory = selected.toPath();
+        String invalidArtworkDirectoryMessage = buildDirectoryConflictMessage(
+                "artwork",
+                artworkDirectory,
+                "music",
+                currentDirectory,
+                "copy",
+                getLastCopyDirectory()
+        );
+        if (invalidArtworkDirectoryMessage != null) {
+            showStyledErrorAlert("Artwork Directory Not Allowed", invalidArtworkDirectoryMessage);
+            statusLabel.setText("Artwork directory must be different from music and copy directories");
+            return;
+        }
+
         saveLastArtworkDirectory(artworkDirectory);
 
         // Update the artwork directory in the three-dot menu
