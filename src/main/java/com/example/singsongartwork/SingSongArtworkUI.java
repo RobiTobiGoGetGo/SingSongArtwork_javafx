@@ -806,9 +806,13 @@ public class SingSongArtworkUI extends Application {
         return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".gif");
     }
 
+    private Label limitsStatusLabel;
+
     private HBox createStatusBar() {
         statusLabel = new Label("Ready. Select a directory to begin.");
         selectionLabel = new Label("Selected: 0 | Visible: 0");
+        limitsStatusLabel = new Label();
+        limitsStatusLabel.setStyle("-fx-text-fill: #7ec8e3;");
 
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -819,6 +823,7 @@ public class SingSongArtworkUI extends Application {
         statusBar.setAlignment(Pos.CENTER_LEFT);
         statusBar.getChildren().add(statusLabel);
         statusBar.getChildren().add(spacer);
+        statusBar.getChildren().add(limitsStatusLabel);
         statusBar.getChildren().add(selectionLabel);
         return statusBar;
     }
@@ -1752,11 +1757,12 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void updateLimitsDisplay() {
-        if (filterPanelBuilder != null && configManager != null) {
-            filterPanelBuilder.setLimitsDisplay(
-                configManager.getMaxCopySizeMb(),
-                configManager.getMaxCopyCount()
-            );
+        if (limitsStatusLabel != null && configManager != null) {
+            int maxMb = configManager.getMaxCopySizeMb();
+            int maxCount = configManager.getMaxCopyCount();
+            String sizeStr = maxMb == ConfigurationManager.NO_LIMIT ? "no limit" : maxMb + " MB";
+            String countStr = maxCount == ConfigurationManager.NO_LIMIT ? "no limit" : String.valueOf(maxCount);
+            limitsStatusLabel.setText("Copy limits:  size: " + sizeStr + "   count: " + countStr + " files  |");
         }
     }
 

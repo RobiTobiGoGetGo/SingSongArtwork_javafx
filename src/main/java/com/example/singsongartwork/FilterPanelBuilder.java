@@ -134,14 +134,6 @@ public class FilterPanelBuilder {
 
         vbox.getChildren().add(filterBox);
 
-        // Limits display row
-        HBox limitsBox = new HBox(8);
-        limitsBox.setAlignment(Pos.CENTER_LEFT);
-        limitsBox.setPadding(new Insets(0, 0, 4, 2));
-        limitsLabel = new Label();
-        limitsLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7ec8e3;");
-        limitsBox.getChildren().add(limitsLabel);
-        vbox.getChildren().add(limitsBox);
 
         return vbox;
     }
