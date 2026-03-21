@@ -29,17 +29,6 @@ public class DialogFactory {
      * Show directory preview dialog with MP3 file listing.
      */
     public static boolean showDirectoryPreview(Path directory, String warningMessage) {
-        return showDirectoryPreview(directory, warningMessage, -1.0, ConfigurationManager.NO_LIMIT);
-    }
-
-    /**
-     * Show directory preview dialog with MP3 file listing and size limit information.
-     *
-     * @param totalMp3SizeMb   total size of all MP3 files in the directory (MB), or -1 if not calculated
-     * @param maxMp3LoadSizeMb limit in MB, or {@link ConfigurationManager#NO_LIMIT} (-1) for no limit
-     */
-    public static boolean showDirectoryPreview(Path directory, String warningMessage,
-                                               double totalMp3SizeMb, int maxMp3LoadSizeMb) {
         try {
             if (directory == null || !Files.isDirectory(directory)) {
                 return false;
@@ -72,11 +61,6 @@ public class DialogFactory {
             otherFilesList.sort(String::compareTo);
             List<String> otherFiles = otherFilesList.stream().limit(10).toList();
 
-            // Determine if the size limit is exceeded
-            boolean limitExceeded = maxMp3LoadSizeMb != ConfigurationManager.NO_LIMIT
-                    && totalMp3SizeMb >= 0
-                    && totalMp3SizeMb > maxMp3LoadSizeMb;
-
             Dialog<ButtonType> previewDialog = new Dialog<>();
             previewDialog.setTitle("Directory Preview");
             previewDialog.setHeaderText("Selected Directory");
@@ -97,38 +81,11 @@ public class DialogFactory {
             dirPathLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #b3b3b3;");
             content.getChildren().add(dirPathLabel);
 
-            // Size info row
-            if (totalMp3SizeMb >= 0) {
-                String sizeText;
-                if (maxMp3LoadSizeMb == ConfigurationManager.NO_LIMIT) {
-                    sizeText = String.format("Total MP3 size: %.1f MB  (no load limit)", totalMp3SizeMb);
-                } else {
-                    sizeText = String.format("Total MP3 size: %.1f MB  /  Limit: %d MB", totalMp3SizeMb, maxMp3LoadSizeMb);
-                }
-                Label sizeLabel = new Label(sizeText);
-                sizeLabel.setWrapText(true);
-                if (limitExceeded) {
-                    sizeLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #ff6b6b;");
-                } else {
-                    sizeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #7ec8e3;");
-                }
-                content.getChildren().add(sizeLabel);
-            }
-
             if (warningMessage != null && !warningMessage.isBlank()) {
                 Label overwriteWarningLabel = new Label(warningMessage);
                 overwriteWarningLabel.setWrapText(true);
                 overwriteWarningLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #ff6b6b;");
                 content.getChildren().add(overwriteWarningLabel);
-            }
-
-            if (limitExceeded) {
-                Label limitWarning = new Label(
-                    String.format("⚠ This directory exceeds the configured limit of %d MB. Loading is disabled. " +
-                                  "An Admin can raise or remove the limit via Options → Max MP3 Load Size.", maxMp3LoadSizeMb));
-                limitWarning.setWrapText(true);
-                limitWarning.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #ff6b6b;");
-                content.getChildren().add(limitWarning);
             }
 
             if (mp3Files.isEmpty()) {
@@ -170,18 +127,11 @@ public class DialogFactory {
             }
 
             previewDialog.getDialogPane().setContent(content);
-
-            if (limitExceeded) {
-                // Only allow cancelling — loading is blocked
-                previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-            } else {
-                previewDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
-                previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
-            }
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.OK);
+            previewDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
             previewDialog.getDialogPane().setPrefWidth(700);
 
-            ButtonType chosen = previewDialog.showAndWait().orElse(ButtonType.CANCEL);
-            return !limitExceeded && chosen == ButtonType.OK;
+            return previewDialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
         } catch (Exception ex) {
             System.err.println("Directory preview error: " + ex.getMessage());
             return false;

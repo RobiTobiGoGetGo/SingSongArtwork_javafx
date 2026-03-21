@@ -299,7 +299,7 @@ public class MenuBarBuilder {
 
             optionsMenu.getItems().add(new SeparatorMenuItem());
 
-            MenuItem maxSizeItem = new MenuItem("Max MP3 Load Size...");
+            MenuItem maxSizeItem = new MenuItem("Max Copy Size...");
             maxSizeItem.setStyle(menuItemStyle);
             maxSizeItem.setOnAction(e -> onConfigureMaxMp3LoadSize.run());
             optionsMenu.getItems().add(maxSizeItem);

@@ -15,12 +15,12 @@ public class ConfigurationManager {
     private static final String KEY_LAST_COPY_DIRECTORY = "last.copy.directory";
     private static final String KEY_UI_COLUMN_MODE = "ui.column.mode";
     private static final String KEY_UI_ROLE = "ui.role";
-    private static final String KEY_MAX_MP3_LOAD_SIZE_MB = "max.mp3.load.size.mb";
+    private static final String KEY_MAX_COPY_SIZE_MB = "max.copy.size.mb";
 
     /** Sentinel value meaning "no limit". */
     public static final int NO_LIMIT = -1;
-    /** Default maximum total MP3 size (in MB) to load from a directory. */
-    public static final int DEFAULT_MAX_MP3_LOAD_SIZE_MB = 500;
+    /** Default maximum total size (in MB) of choices that can be copied at once. */
+    public static final int DEFAULT_MAX_COPY_SIZE_MB = 500;
 
     private final Path configFile;
 
@@ -193,14 +193,14 @@ public class ConfigurationManager {
     }
 
     /**
-     * Get the maximum total MP3 size (in MB) allowed when loading a directory.
+     * Get the maximum total size (in MB) of chosen files allowed in a copy operation.
      * Returns {@link #NO_LIMIT} (-1) if there is no limit.
      */
-    public int getMaxMp3LoadSizeMb() {
+    public int getMaxCopySizeMb() {
         try {
             if (Files.exists(configFile)) {
                 Properties props = loadProperties();
-                String raw = props.getProperty(KEY_MAX_MP3_LOAD_SIZE_MB);
+                String raw = props.getProperty(KEY_MAX_COPY_SIZE_MB);
                 if (raw != null && !raw.isBlank()) {
                     return Integer.parseInt(raw.trim());
                 }
@@ -208,21 +208,21 @@ public class ConfigurationManager {
         } catch (Exception ex) {
             // Silently ignore
         }
-        return DEFAULT_MAX_MP3_LOAD_SIZE_MB;
+        return DEFAULT_MAX_COPY_SIZE_MB;
     }
 
     /**
-     * Save the maximum MP3 load size setting.
+     * Save the maximum copy size setting (in MB).
      * Pass {@link #NO_LIMIT} (-1) to disable the limit.
      */
-    public void saveMaxMp3LoadSizeMb(int mb) {
+    public void saveMaxCopySizeMb(int mb) {
         try {
             ensureConfigDirectory();
             Properties props = loadProperties();
-            props.setProperty(KEY_MAX_MP3_LOAD_SIZE_MB, String.valueOf(mb));
+            props.setProperty(KEY_MAX_COPY_SIZE_MB, String.valueOf(mb));
             saveProperties(props);
         } catch (IOException ex) {
-            System.err.println("Warning: Could not save max MP3 load size preference: " + ex.getMessage());
+            System.err.println("Warning: Could not save max copy size preference: " + ex.getMessage());
         }
     }
 

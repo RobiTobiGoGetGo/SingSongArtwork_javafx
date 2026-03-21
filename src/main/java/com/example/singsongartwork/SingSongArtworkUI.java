@@ -162,7 +162,7 @@ public class SingSongArtworkUI extends Application {
                     saveUiPreferences();
                 },
                 this::handleRoleChangeRequested,
-                this::showMaxMp3LoadSizeDialog
+                this::showMaxCopySizeDialog
         );
 
         var menus = menuBarBuilder.buildMenus();
@@ -276,12 +276,12 @@ public class SingSongArtworkUI extends Application {
         DialogFactory.showKeyboardShortcuts();
     }
 
-    private void showMaxMp3LoadSizeDialog() {
-        int current = configManager.getMaxMp3LoadSizeMb();
+    private void showMaxCopySizeDialog() {
+        int current = configManager.getMaxCopySizeMb();
 
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Max MP3 Load Size");
-        dialog.setHeaderText("Configure Maximum MP3 Directory Load Size");
+        dialog.setTitle("Max Copy Size");
+        dialog.setHeaderText("Configure Maximum Copy Size");
 
         try {
             dialog.getDialogPane().getStylesheets().add(
@@ -295,8 +295,8 @@ public class SingSongArtworkUI extends Application {
         content.setPadding(new javafx.geometry.Insets(20));
 
         Label desc = new Label(
-            "Set the maximum total size (in MB) of MP3 files that can be loaded from a directory.\n" +
-            "If a directory exceeds this limit, loading will be blocked.\n" +
+            "Set the maximum total size (in MB) of chosen MP3 files that can be copied at once.\n" +
+            "If the selected choices exceed this limit, copying will be blocked.\n" +
             "Set to 0 or leave blank for no limit."
         );
         desc.setWrapText(true);
@@ -334,26 +334,26 @@ public class SingSongArtworkUI extends Application {
         ButtonType result = dialog.showAndWait().orElse(ButtonType.CANCEL);
         if (result == saveButton) {
             if (noLimitBox.isSelected()) {
-                configManager.saveMaxMp3LoadSizeMb(ConfigurationManager.NO_LIMIT);
-                appendAppLog("Max MP3 load size set to: No limit");
-                if (statusLabel != null) statusLabel.setText("Max MP3 load size: No limit");
+                configManager.saveMaxCopySizeMb(ConfigurationManager.NO_LIMIT);
+                appendAppLog("Max copy size set to: No limit");
+                if (statusLabel != null) statusLabel.setText("Max copy size: No limit");
             } else {
                 String raw = mbField.getText().trim();
                 if (raw.isBlank()) {
-                    configManager.saveMaxMp3LoadSizeMb(ConfigurationManager.NO_LIMIT);
-                    appendAppLog("Max MP3 load size set to: No limit");
-                    if (statusLabel != null) statusLabel.setText("Max MP3 load size: No limit");
+                    configManager.saveMaxCopySizeMb(ConfigurationManager.NO_LIMIT);
+                    appendAppLog("Max copy size set to: No limit");
+                    if (statusLabel != null) statusLabel.setText("Max copy size: No limit");
                 } else {
                     try {
                         int mb = Integer.parseInt(raw);
                         if (mb <= 0) {
-                            configManager.saveMaxMp3LoadSizeMb(ConfigurationManager.NO_LIMIT);
-                            appendAppLog("Max MP3 load size set to: No limit");
-                            if (statusLabel != null) statusLabel.setText("Max MP3 load size: No limit");
+                            configManager.saveMaxCopySizeMb(ConfigurationManager.NO_LIMIT);
+                            appendAppLog("Max copy size set to: No limit");
+                            if (statusLabel != null) statusLabel.setText("Max copy size: No limit");
                         } else {
-                            configManager.saveMaxMp3LoadSizeMb(mb);
-                            appendAppLog("Max MP3 load size set to: " + mb + " MB");
-                            if (statusLabel != null) statusLabel.setText("Max MP3 load size set to " + mb + " MB");
+                            configManager.saveMaxCopySizeMb(mb);
+                            appendAppLog("Max copy size set to: " + mb + " MB");
+                            if (statusLabel != null) statusLabel.setText("Max copy size set to " + mb + " MB");
                         }
                     } catch (NumberFormatException ex) {
                         Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter a valid number of megabytes.", ButtonType.OK);
@@ -658,9 +658,7 @@ public class SingSongArtworkUI extends Application {
     }
 
     private boolean showDirectoryPreview(Path directory, String warningMessage) {
-        double totalMb = service != null ? service.calculateTotalMp3SizeMb(directory) : -1.0;
-        int limitMb = configManager != null ? configManager.getMaxMp3LoadSizeMb() : ConfigurationManager.NO_LIMIT;
-        return DialogFactory.showDirectoryPreview(directory, warningMessage, totalMb, limitMb);
+        return DialogFactory.showDirectoryPreview(directory, warningMessage);
     }
 
 
@@ -1049,6 +1047,30 @@ public class SingSongArtworkUI extends Application {
         if (copyDirectory == null || !Files.isDirectory(copyDirectory)) {
             statusLabel.setText("Error: No copy directory set. Please choose a copy directory first.");
             return;
+        }
+
+        // Enforce max copy size limit
+        int maxCopySizeMb = configManager.getMaxCopySizeMb();
+        if (maxCopySizeMb != ConfigurationManager.NO_LIMIT) {
+            double totalMb = choicesTrackPaths.stream().mapToLong(p -> {
+                try { return Files.size(p); } catch (IOException e) { return 0L; }
+            }).sum() / (1024.0 * 1024.0);
+            if (totalMb > maxCopySizeMb) {
+                Alert alert = new Alert(Alert.AlertType.ERROR,
+                    String.format("The selected choices total %.1f MB, which exceeds the configured limit of %d MB.%n" +
+                                  "Please reduce the selection, or ask an Admin to raise the limit via Options → Max Copy Size.",
+                                  totalMb, maxCopySizeMb),
+                    ButtonType.OK);
+                alert.setTitle("Copy Size Limit Exceeded");
+                try {
+                    alert.getDialogPane().getStylesheets().add(
+                        getClass().getResource("/styles/modern-dark.css").toExternalForm()
+                    );
+                } catch (Exception ignore) {}
+                alert.showAndWait();
+                statusLabel.setText(String.format("Copy blocked: %.1f MB exceeds limit of %d MB", totalMb, maxCopySizeMb));
+                return;
+            }
         }
 
         String overwriteWarning = buildOverwriteWarning(copyDirectory, choicesTrackPaths);
