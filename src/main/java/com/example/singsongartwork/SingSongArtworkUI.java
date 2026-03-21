@@ -161,7 +161,8 @@ public class SingSongArtworkUI extends Application {
                     applyColumnMode();
                     saveUiPreferences();
                 },
-                this::handleRoleChangeRequested
+                this::handleRoleChangeRequested,
+                this::showMaxMp3LoadSizeDialog
         );
 
         var menus = menuBarBuilder.buildMenus();
@@ -273,6 +274,99 @@ public class SingSongArtworkUI extends Application {
 
     private void showKeyboardShortcuts() {
         DialogFactory.showKeyboardShortcuts();
+    }
+
+    private void showMaxMp3LoadSizeDialog() {
+        int current = configManager.getMaxMp3LoadSizeMb();
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Max MP3 Load Size");
+        dialog.setHeaderText("Configure Maximum MP3 Directory Load Size");
+
+        try {
+            dialog.getDialogPane().getStylesheets().add(
+                getClass().getResource("/styles/modern-dark.css").toExternalForm()
+            );
+        } catch (Exception ex) {
+            // CSS not found, continue with default styling
+        }
+
+        javafx.scene.layout.VBox content = new javafx.scene.layout.VBox(14);
+        content.setPadding(new javafx.geometry.Insets(20));
+
+        Label desc = new Label(
+            "Set the maximum total size (in MB) of MP3 files that can be loaded from a directory.\n" +
+            "If a directory exceeds this limit, loading will be blocked.\n" +
+            "Set to 0 or leave blank for no limit."
+        );
+        desc.setWrapText(true);
+        desc.setStyle("-fx-font-size: 12px; -fx-text-fill: #b3b3b3;");
+        content.getChildren().add(desc);
+
+        Label currentLabel = new Label(current == ConfigurationManager.NO_LIMIT
+            ? "Current limit: No limit"
+            : "Current limit: " + current + " MB");
+        currentLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #7ec8e3;");
+        content.getChildren().add(currentLabel);
+
+        TextField mbField = new TextField(current == ConfigurationManager.NO_LIMIT ? "" : String.valueOf(current));
+        mbField.setPromptText("e.g. 500  (leave blank for no limit)");
+        mbField.setStyle("-fx-font-size: 13px;");
+        content.getChildren().add(mbField);
+
+        CheckBox noLimitBox = new CheckBox("No limit");
+        noLimitBox.setStyle("-fx-font-size: 12px;");
+        noLimitBox.setSelected(current == ConfigurationManager.NO_LIMIT);
+        noLimitBox.setOnAction(e -> {
+            mbField.setDisable(noLimitBox.isSelected());
+            if (noLimitBox.isSelected()) mbField.clear();
+        });
+        mbField.setDisable(noLimitBox.isSelected());
+        content.getChildren().add(noLimitBox);
+
+        dialog.getDialogPane().setContent(content);
+        ButtonType saveButton = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButton, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefWidth(500);
+
+        Platform.runLater(mbField::requestFocus);
+
+        ButtonType result = dialog.showAndWait().orElse(ButtonType.CANCEL);
+        if (result == saveButton) {
+            if (noLimitBox.isSelected()) {
+                configManager.saveMaxMp3LoadSizeMb(ConfigurationManager.NO_LIMIT);
+                appendAppLog("Max MP3 load size set to: No limit");
+                if (statusLabel != null) statusLabel.setText("Max MP3 load size: No limit");
+            } else {
+                String raw = mbField.getText().trim();
+                if (raw.isBlank()) {
+                    configManager.saveMaxMp3LoadSizeMb(ConfigurationManager.NO_LIMIT);
+                    appendAppLog("Max MP3 load size set to: No limit");
+                    if (statusLabel != null) statusLabel.setText("Max MP3 load size: No limit");
+                } else {
+                    try {
+                        int mb = Integer.parseInt(raw);
+                        if (mb <= 0) {
+                            configManager.saveMaxMp3LoadSizeMb(ConfigurationManager.NO_LIMIT);
+                            appendAppLog("Max MP3 load size set to: No limit");
+                            if (statusLabel != null) statusLabel.setText("Max MP3 load size: No limit");
+                        } else {
+                            configManager.saveMaxMp3LoadSizeMb(mb);
+                            appendAppLog("Max MP3 load size set to: " + mb + " MB");
+                            if (statusLabel != null) statusLabel.setText("Max MP3 load size set to " + mb + " MB");
+                        }
+                    } catch (NumberFormatException ex) {
+                        Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter a valid number of megabytes.", ButtonType.OK);
+                        try {
+                            alert.getDialogPane().getStylesheets().add(
+                                getClass().getResource("/styles/modern-dark.css").toExternalForm()
+                            );
+                        } catch (Exception ignore) {}
+                        alert.showAndWait();
+                    }
+                }
+            }
+        }
     }
 
     private VBox createTopPanel() {
@@ -564,7 +658,9 @@ public class SingSongArtworkUI extends Application {
     }
 
     private boolean showDirectoryPreview(Path directory, String warningMessage) {
-        return DialogFactory.showDirectoryPreview(directory, warningMessage);
+        double totalMb = service != null ? service.calculateTotalMp3SizeMb(directory) : -1.0;
+        int limitMb = configManager != null ? configManager.getMaxMp3LoadSizeMb() : ConfigurationManager.NO_LIMIT;
+        return DialogFactory.showDirectoryPreview(directory, warningMessage, totalMb, limitMb);
     }
 
 

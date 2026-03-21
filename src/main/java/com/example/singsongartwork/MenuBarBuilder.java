@@ -36,6 +36,7 @@ public class MenuBarBuilder {
     private final Runnable onClearChoices;
     private final java.util.function.Consumer<Integer> onColumnModeChanged;
     private final java.util.function.Consumer<Boolean> onRoleChanged;
+    private final Runnable onConfigureMaxMp3LoadSize;
 
     public MenuBarBuilder(
             Runnable onShowAppLog,
@@ -50,7 +51,8 @@ public class MenuBarBuilder {
             Runnable onCopyChoices,
             Runnable onClearChoices,
             java.util.function.Consumer<Integer> onColumnModeChanged,
-            java.util.function.Consumer<Boolean> onRoleChanged) {
+            java.util.function.Consumer<Boolean> onRoleChanged,
+            Runnable onConfigureMaxMp3LoadSize) {
         this.onShowAppLog = onShowAppLog;
         this.onShowReadme = onShowReadme;
         this.onShowLicense = onShowLicense;
@@ -64,6 +66,7 @@ public class MenuBarBuilder {
         this.onClearChoices = onClearChoices;
         this.onColumnModeChanged = onColumnModeChanged;
         this.onRoleChanged = onRoleChanged;
+        this.onConfigureMaxMp3LoadSize = onConfigureMaxMp3LoadSize;
     }
 
     /**
@@ -293,6 +296,13 @@ public class MenuBarBuilder {
             clearChoicesItem.setStyle(menuItemStyle);
             clearChoicesItem.setOnAction(e -> onClearChoices.run());
             optionsMenu.getItems().add(clearChoicesItem);
+
+            optionsMenu.getItems().add(new SeparatorMenuItem());
+
+            MenuItem maxSizeItem = new MenuItem("Max MP3 Load Size...");
+            maxSizeItem.setStyle(menuItemStyle);
+            maxSizeItem.setOnAction(e -> onConfigureMaxMp3LoadSize.run());
+            optionsMenu.getItems().add(maxSizeItem);
         }
     }
 

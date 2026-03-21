@@ -36,6 +36,38 @@ public class Mp3MetadataService {
         }
     }
 
+    /**
+     * Calculate the total size of all MP3 files in a directory, in megabytes.
+     * Returns 0.0 if the directory cannot be read.
+     */
+    public double calculateTotalMp3SizeMb(Path directory) {
+        try (Stream<Path> stream = Files.list(directory)) {
+            return stream
+                    .filter(path -> !Files.isDirectory(path))
+                    .filter(this::isMp3)
+                    .mapToLong(path -> {
+                        try { return Files.size(path); } catch (IOException e) { return 0L; }
+                    })
+                    .sum() / (1024.0 * 1024.0);
+        } catch (IOException ex) {
+            return 0.0;
+        }
+    }
+
+    /**
+     * Count the number of MP3 files in a directory.
+     */
+    public long countMp3Files(Path directory) {
+        try (Stream<Path> stream = Files.list(directory)) {
+            return stream
+                    .filter(path -> !Files.isDirectory(path))
+                    .filter(this::isMp3)
+                    .count();
+        } catch (IOException ex) {
+            return 0;
+        }
+    }
+
     public List<TrackEntry> sortTracks(List<TrackEntry> tracks, List<SortField> sortFields) {
         if (sortFields == null || sortFields.isEmpty()) {
             return new ArrayList<>(tracks);
