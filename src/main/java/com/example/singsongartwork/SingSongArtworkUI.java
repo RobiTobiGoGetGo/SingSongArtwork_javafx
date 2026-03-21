@@ -1428,8 +1428,16 @@ public class SingSongArtworkUI extends Application {
     }
 
     private void showStyledErrorAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        Label contentLabel = new Label(message);
+        contentLabel.setWrapText(true);
+        contentLabel.setMaxWidth(520);
+
+        Alert alert = new Alert(Alert.AlertType.ERROR, "", ButtonType.OK);
         alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.getDialogPane().setContent(contentLabel);
+        alert.getDialogPane().setPrefWidth(560);
+        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
         try {
             alert.getDialogPane().getStylesheets().add(
                 getClass().getResource("/styles/modern-dark.css").toExternalForm()
